@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lilen · Caja</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style id="pageStyle"></style>
+<style>
+:root{
+  --bg:#f6f4f1; --card:#fff; --ink:#1f1d1a; --muted:#7a746c; --line:#e6e1da;
+  --acc:#8a3d5c; --acc-ink:#fff; --ok:#2e7d4f; --bad:#b3261e;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--ink);color:#fff;flex-wrap:wrap}
+header h1{font-size:20px;margin:0;letter-spacing:.5px}
+header h1 span{color:#e9b8cb}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav button{background:transparent;color:#ddd;border:1px solid #444;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:15px}
+nav button.on{background:#fff;color:var(--ink);border-color:#fff}
+.hdr-right{margin-left:auto;font-size:13px;color:#bbb;display:flex;gap:10px;align-items:center}
+.hdr-right button{background:none;border:1px solid #555;color:#ddd;border-radius:6px;padding:4px 10px;cursor:pointer}
+main{padding:20px;max-width:1200px;margin:0 auto}
+.tab{display:none}.tab.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+h2{font-size:17px;margin:0 0 12px}
+input,select{font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+button.btn{font-size:15px;padding:10px 16px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer}
+button.pri{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+button.big{font-size:20px;padding:16px 22px;width:100%}
+button.danger{color:var(--bad)}
+button:disabled{opacity:.5;cursor:default}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);font-size:15px}
+th{font-size:13px;color:var(--muted);font-weight:600}
+td.num,th.num{text-align:right}
+.muted{color:var(--muted)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.banner{padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:14px;background:#fff4d6;border:1px solid #f0d58a}
+/* Caja */
+.caja{display:grid;grid-template-columns:1fr 360px;gap:16px}
+@media(max-width:860px){.caja{grid-template-columns:1fr}}
+#scan{width:100%;font-size:22px;padding:14px;border:2px solid var(--acc)}
+#scanMsg{min-height:22px;margin-top:6px;font-size:14px}
+.err{color:var(--bad)}.okc{color:var(--ok)}
+.quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.quick button{padding:12px 8px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;text-align:left}
+.quick b{display:block;font-size:14px}.quick small{color:var(--muted)}
+.total{font-size:44px;font-weight:700;text-align:right;margin:8px 0 16px}
+.qty{display:inline-flex;align-items:center;gap:6px}
+.qty button{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer}
+/* Ventas */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.stat .v{font-size:28px;font-weight:700}.stat .l{font-size:13px;color:var(--muted)}
+.anulada td{text-decoration:line-through;color:var(--muted)}
+/* Etiquetas */
+.labels{display:flex;flex-wrap:wrap;gap:4mm}
+.lbl{width:50mm;height:30mm;border:1px dashed #bbb;padding:1.5mm;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;background:#fff;color:#000;font-family:Arial,sans-serif}
+.lbl .s{font-size:8pt;letter-spacing:1px;font-weight:700}
+.lbl .n{font-size:8pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.lbl .p{font-size:12pt;font-weight:700}
+.lbl svg{max-width:100%;height:12mm}
+/* Login */
+#login{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:10}
+#login .card{width:320px}
+#login input{width:100%;margin-bottom:10px}
+/* Impresión */
+#printArea{display:none}
+@media print{
+  body>*:not(#printArea){display:none!important}
+  #printArea{display:block!important}
+  body{background:#fff}
+  .lbl{border:none}
+}
+.tk{font-family:'Courier New',monospace;font-size:11pt;color:#000;padding:3mm;width:100%}
+.tk .c{text-align:center}.tk .h{font-size:16pt;font-weight:700;letter-spacing:2px}
+.tk hr{border:none;border-top:1px dashed #000;margin:2mm 0}
+.tk .l{display:flex;justify-content:space-between;gap:4px}
+.tk .tot{font-size:14pt;font-weight:700}
+</style>
+</head>
+<body>
+
+<script>
+/* ============ CONFIGURACIÓN ============
+   Completá SUPABASE_URL y SUPABASE_ANON_KEY para que las 3 PCs compartan datos.
+   Si quedan vacíos, funciona en "modo local" (los datos quedan solo en esa PC). */
+const CONFIG = {
+  NOMBRE_LOCAL: 'LILEN',
+  SUBTITULO: 'Lilen Márquez Indumentaria',
+  PIE_RECIBO: '¡Gracias por tu compra!\nComprobante no válido como factura',
+  ANCHO_TICKET_MM: 80,          // 80 o 58 según la impresora térmica
+  SUPABASE_URL: '',
+  SUPABASE_ANON_KEY: '',
+  MEDIOS_PAGO: ['Efectivo','Débito','Crédito','Transferencia','QR / Mercado Pago'],
+};
+</script>
+
+<header>
+  <h1>Lilen <span>· Caja</span></h1>
+  <nav>
+    <button data-t="caja" class="on">Caja</button>
+    <button data-t="ventas">Ventas</button>
+    <button data-t="articulos">Artículos</button>
+    <button data-t="etiquetas">Etiquetas</button>
+  </nav>
+  <div class="hdr-right"><span id="modo"></span><button id="logout" style="display:none">Salir</button></div>
+</header>
+
+<main>
+  <div id="bannerLocal" class="banner" style="display:none">
+    Modo local: las ventas se guardan solo en esta computadora. Para compartirlas entre las 3 PCs, configurá Supabase en el archivo.
+  </div>
+
+  <!-- CAJA -->
+  <section id="caja" class="tab on">
+    <div class="caja">
+      <div>
+        <div class="card">
+          <input id="scan" placeholder="Pasá el código de barras (o escribilo y Enter)" autocomplete="off">
+          <div id="scanMsg"></div>
+        </div>
+        <div class="card">
+          <h2>Venta actual</h2>
+          <table>
+            <thead><tr><th>Artículo</th><th class="num">Precio</th><th>Cant.</th><th class="num">Subtotal</th><th></th></tr></thead>
+            <tbody id="cart"></tbody>
+          </table>
+          <p id="cartEmpty" class="muted">Todavía no hay artículos.</p>
+        </div>
+        <div class="card">
+          <h2>Carga rápida <span class="muted" style="font-weight:400;font-size:13px">(si no lee el código)</span></h2>
+          <div id="quick" class="quick"></div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="muted">Total</div>
+          <div class="total" id="total">$ 0</div>
+          <label class="muted" style="font-size:13px">Medio de pago</label>
+          <select id="medio" style="width:100%;margin:4px 0 12px"></select>
+          <label class="row" style="margin-bottom:12px;font-size:15px"><input type="checkbox" id="imprimirChk" checked style="width:18px;height:18px"> Imprimir recibo</label>
+          <button class="btn pri big" id="cobrar" disabled>Cobrar (F2)</button>
+          <button class="btn" id="vaciar" style="width:100%;margin-top:8px">Vaciar venta</button>
+        </div>
+        <div class="card">
+          <div class="muted">Vendido hoy</div>
+          <div style="font-size:26px;font-weight:700" id="hoyTotal">$ 0</div>
+          <div class="muted" id="hoyCant">0 ventas</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VENTAS -->
+  <section id="ventas" class="tab">
+    <div class="card row">
+      <label>Día <input type="date" id="dia"></label>
+      <button class="btn" id="hoyBtn">Hoy</button>
+      <button class="btn" id="csvBtn">Exportar mes (Excel/CSV)</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="l" id="lblDia">Día</div><div class="v" id="sDia">$ 0</div><div class="l" id="sDiaN"></div></div>
+      <div class="stat"><div class="l" id="lblMes">Mes</div><div class="v" id="sMes">$ 0</div><div class="l" id="sMesN"></div></div>
+      <div class="stat"><div class="l">Ticket promedio del mes</div><div class="v" id="sProm">$ 0</div></div>
+    </div>
+    <div class="card">
+      <h2>Ventas del día</h2>
+      <table><thead><tr><th>N°</th><th>Hora</th><th>Artículos</th><th>Pago</th><th class="num">Total</th><th></th></tr></thead><tbody id="tVentas"></tbody></table>
+    </div>
+    <div class="caja" style="grid-template-columns:1fr 1fr">
+      <div class="card"><h2>Mes por artículo</h2>
+        <table><thead><tr><th>Artículo</th><th class="num">Unid.</th><th class="num">Total</th></tr></thead><tbody id="tPorItem"></tbody></table></div>
+      <div class="card"><h2>Mes por medio de pago</h2>
+        <table><thead><tr><th>Medio</th><th class="num">Ventas</th><th class="num">Total</th></tr></thead><tbody id="tPorMedio"></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ARTÍCULOS -->
+  <section id="articulos" class="tab">
+    <div class="card">
+      <h2 id="formTit">Nuevo artículo</h2>
+      <div class="row">
+        <input id="fNombre" placeholder="Nombre (ej: Ítem 1 / Remera)" style="flex:2;min-width:180px">
+        <input id="fPrecio" type="number" min="0" step="1" placeholder="Precio" style="width:140px">
+        <input id="fCodigo" placeholder="Código" style="width:130px" title="Se genera solo; podés cambiarlo">
+        <button class="btn pri" id="fGuardar">Guardar</button>
+        <button class="btn" id="fCancelar" style="display:none">Cancelar</button>
+      </div>
+      <div id="fMsg" style="margin-top:8px;font-size:14px"></div>
+    </div>
+    <div class="card">
+      <table><thead><tr><th>Código</th><th>Artículo</th><th class="num">Precio</th><th></th></tr></thead><tbody id="tItems"></tbody></table>
+      <p class="muted" style="font-size:13px">Si cambiás un precio, las etiquetas viejas siguen sirviendo: el código es el mismo y cobra el precio nuevo. Las ventas pasadas guardan el precio de ese momento.</p>
+    </div>
+  </section>
+
+  <!-- ETIQUETAS -->
+  <section id="etiquetas" class="tab">
+    <div class="card">
+      <h2>¿Cuántas etiquetas de cada uno?</h2>
+      <table><thead><tr><th>Artículo</th><th class="num">Precio</th><th>Cantidad</th></tr></thead><tbody id="tEtq"></tbody></table>
+      <div class="row" style="margin-top:12px">
+        <label><input type="checkbox" id="etqPrecio" checked> Mostrar precio en la etiqueta</label>
+        <button class="btn" id="etqPrev">Vista previa</button>
+        <button class="btn pri" id="etqPrint">Imprimir etiquetas</button>
+      </div>
+      <p class="muted" style="font-size:13px">Etiquetas de 50 × 30 mm en hoja A4 (para recortar o en hoja autoadhesiva).</p>
+    </div>
+    <div class="card"><div id="etqPreview" class="labels"></div></div>
+  </section>
+</main>
+
+<div id="login">
+  <div class="card">
+    <h2>Ingresar a la caja</h2>
+    <input id="lEmail" type="email" placeholder="Email">
+    <input id="lPass" type="password" placeholder="Contraseña">
+    <button class="btn pri big" id="lBtn">Entrar</button>
+    <div id="lMsg" class="err" style="margin-top:8px;font-size:14px"></div>
+  </div>
+</div>
+
+<div id="printArea"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const fmt = n => '$ ' + Math.round(Number(n)||0).toLocaleString('es-AR');
+const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pad = (n,l=6) => String(n).padStart(l,'0');
+const fechaHora = iso => { const d=new Date(iso); return d.toLocaleDateString('es-AR')+' '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false}); };
+const hora = iso => new Date(iso).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false});
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1,2)}-${pad(d.getDate(),2)}`;
+
+/* ============ DATOS ============ */
+const usaSupabase = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
+const sb = usaSupabase ? supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
+
+const Local = {
+  get(k){ try{ return JSON.parse(localStorage.getItem(k)) || []; }catch{ return []; } },
+  set(k,v){ localStorage.setItem(k, JSON.stringify(v)); },
+  async listItems(){ return this.get('lilen_articulos'); },
+  async saveItem(it){
+    const a = this.get('lilen_articulos');
+    if (a.some(x => x.codigo === it.codigo && x.id !== it.id)) throw new Error('Ya existe un artículo con ese código');
+    if (it.id){ const i = a.findIndex(x => x.id === it.id); a[i] = {...a[i], ...it}; }
+    else { it = {...it, id: Date.now(), activo: true}; a.push(it); }
+    this.set('lilen_articulos', a); return it;
+  },
+  async addSale(s){
+    const v = this.get('lilen_ventas');
+    const n = {...s, id: (v.length ? v[v.length-1].id : 0) + 1, fecha: new Date().toISOString(), anulada: false};
+    v.push(n); this.set('lilen_ventas', v); return n;
+  },
+  async listSales(desde, hasta){
+    const a = desde.toISOString(), b = hasta.toISOString();
+    return this.get('lilen_ventas').filter(x => x.fecha >= a && x.fecha < b);
+  },
+  async voidSale(id){
+    const v = this.get('lilen_ventas'); const x = v.find(x => x.id === id); if (x) x.anulada = true; this.set('lilen_ventas', v);
+  }
+};
+
+const Remote = {
+  norm: r => ({...r, precio: Number(r.precio)}),
+  async listItems(){
+    const {data, error} = await sb.from('articulos').select('*').order('codigo');
+    if (error) throw error; return data.map(this.norm);
+  },
+  async saveItem(it){
+    const campos = {codigo: it.codigo, nombre: it.nombre, precio: it.precio, activo: it.activo ?? true};
+    const q = it.id ? sb.from('articulos').update(campos).eq('id', it.id) : sb.from('articulos').insert(campos);
+    const {data, error} = await q.select().single();
+    if (error){ if (error.code === '23505') throw new Error('Ya existe un artículo con ese código'); throw error; }
+    return this.norm(data);
+  },
+  async addSale(s){
+    const {data, error} = await sb.from('ventas').insert({total: s.total, medio_pago: s.medio_pago, items: s.items}).select().single();
+    if (error) throw error; return data;
+  },
+  async listSales(desde, hasta){
+    let todas = [], from = 0;
+    while (true){ // Supabase devuelve de a 1000 filas
+      const {data, error} = await sb.from('ventas').select('*')
+        .gte('fecha', desde.toISOString()).lt('fecha', hasta.toISOString())
+        .order('id').range(from, from + 999);
+      if (error) throw error;
+      todas = todas.concat(data);
+      if (data.length < 1000) break;
+      from += 1000;
+    }
+    return todas.map(v => ({...v, total: Number(v.total)}));
+  },
+  async voidSale(id){
+    const {error} = await sb.from('ventas').update({anulada: true}).eq('id', id);
+    if (error) throw error;
+  }
+};
+const DB = usaSupabase ? Remote : Local;
+
+/* ============ ESTADO ============ */
+let items = [];
+let cart = [];
+let editando = null;
+
+function activos(){ return items.filter(i => i.activo !== false).sort((a,b) => a.codigo.localeCompare(b.codigo, undefined, {numeric:true})); }
+
+/* ============ TABS ============ */
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === b.dataset.t));
+  if (b.dataset.t === 'ventas') cargarVentas();
+  if (b.dataset.t === 'etiquetas') renderEtq();
+  if (b.dataset.t === 'caja') $('#scan').focus();
+});
+
+/* ============ CAJA ============ */
+function beep(ok){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(); o.frequency.value = ok ? 1200 : 220; o.connect(ctx.destination);
+    o.start(); o.stop(ctx.currentTime + (ok ? .07 : .3));
+  }catch{}
+}
+
+function agregar(codigo){
+  const it = activos().find(i => i.codigo === codigo);
+  if (!it){ $('#scanMsg').innerHTML = `<span class="err">No existe un artículo con código "${esc(codigo)}"</span>`; beep(false); return; }
+  const l = cart.find(c => c.codigo === it.codigo);
+  if (l) l.cant++; else cart.push({codigo: it.codigo, nombre: it.nombre, precio: it.precio, cant: 1});
+  $('#scanMsg').innerHTML = `<span class="okc">+ ${esc(it.nombre)} · ${fmt(it.precio)}</span>`;
+  beep(true); renderCart();
+}
+
+$('#scan').addEventListener('keydown', e => {
+  if (e.key === 'Enter'){ const v = e.target.value.trim(); e.target.value = ''; if (v) agregar(v); }
+});
+
+function totalCart(){ return cart.reduce((s,l) => s + l.precio * l.cant, 0); }
+
+function renderCart(){
+  $('#cart').innerHTML = cart.map((l,i) => `<tr>
+    <td>${esc(l.nombre)} <span class="muted" style="font-size:12px">${esc(l.codigo)}</span></td>
+    <td class="num">${fmt(l.precio)}</td>
+    <td><span class="qty"><button data-i="${i}" data-d="-1">−</button>${l.cant}<button data-i="${i}" data-d="1">+</button></span></td>
+    <td class="num">${fmt(l.precio * l.cant)}</td>
+    <td><button class="btn danger" data-del="${i}" style="padding:4px 10px">✕</button></td></tr>`).join('');
+  $('#cartEmpty').style.display = cart.length ? 'none' : 'block';
+  $('#total').textContent = fmt(totalCart());
+  $('#cobrar').disabled = !cart.length;
+}
+
+$('#cart').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.del !== undefined) cart.splice(+b.dataset.del, 1);
+  else { const l = cart[+b.dataset.i]; l.cant += +b.dataset.d; if (l.cant <= 0) cart.splice(+b.dataset.i, 1); }
+  renderCart(); $('#scan').focus();
+});
+
+function renderQuick(){
+  $('#quick').innerHTML = activos().map(i => `<button data-c="${esc(i.codigo)}"><b>${esc(i.nombre)}</b><small>${fmt(i.precio)}</small></button>`).join('')
+    || '<span class="muted">Cargá artículos en la pestaña Artículos.</span>';
+}
+$('#quick').addEventListener('click', e => { const b = e.target.closest('button'); if (b){ agregar(b.dataset.c); $('#scan').focus(); } });
+
+$('#medio').innerHTML = CONFIG.MEDIOS_PAGO.map(m => `<option>${esc(m)}</option>`).join('');
+
+$('#vaciar').onclick = () => { if (cart.length && confirm('¿Vaciar la venta actual?')){ cart = []; renderCart(); } $('#scan').focus(); };
+
+let cobrando = false;
+async function cobrar(){
+  if (!cart.length || cobrando) return;
+  cobrando = true; $('#cobrar').disabled = true;
+  try{
+    const venta = await DB.addSale({total: totalCart(), medio_pago: $('#medio').value, items: cart.map(l => ({...l}))});
+    if ($('#imprimirChk').checked) imprimirTicket(venta);
+    $('#scanMsg').innerHTML = `<span class="okc">Venta N° ${venta.id} guardada · ${fmt(venta.total)}</span>`;
+    cart = []; renderCart(); actualizarHoy();
+  }catch(err){
+    alert('No se pudo guardar la venta: ' + (err.message || err)); 
+  }finally{ cobrando = false; renderCart(); $('#scan').focus(); }
+}
+$('#cobrar').onclick = cobrar;
+document.addEventListener('keydown', e => { if (e.key === 'F2' && $('#caja').classList.contains('on')){ e.preventDefault(); cobrar(); } });
+
+// Que el lector siempre escriba en el campo de código
+document.addEventListener('click', e => {
+  if ($('#caja').classList.contains('on') && !e.target.closest('input,select,button,label')) $('#scan').focus();
+});
+
+async function actualizarHoy(){
+  const h = new Date(); const d = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+  try{
+    const v = (await DB.listSales(d, new Date(d.getTime() + 864e5))).filter(x => !x.anulada);
+    $('#hoyTotal').textContent = fmt(v.reduce((s,x) => s + Number(x.total), 0));
+    $('#hoyCant').textContent = `${v.length} venta${v.length === 1 ? '' : 's'}`;
+  }catch{}
+}
+
+/* ============ IMPRESIÓN ============ */
+function imprimir(html, tipo){
+  const area = $('#printArea'); area.innerHTML = html;
+  $('#pageStyle').textContent = tipo === 'ticket'
+    ? `@page{size:${CONFIG.ANCHO_TICKET_MM}mm auto;margin:0}`
+    : '@page{size:A4;margin:8mm}';
+  setTimeout(() => window.print(), 80);
+}
+
+function imprimirTicket(v){
+  const items = v.items || [];
+  imprimir(`<div class="tk">
+    <div class="c h">${esc(CONFIG.NOMBRE_LOCAL)}</div>
+    <div class="c">${esc(CONFIG.SUBTITULO)}</div><hr>
+    <div>Recibo N° ${pad(v.id)}</div><div>${fechaHora(v.fecha)}</div><hr>
+    ${items.map(l => `<div>${esc(l.nombre)}</div><div class="l"><span>&nbsp;${l.cant} x ${fmt(l.precio)}</span><span>${fmt(l.precio * l.cant)}</span></div>`).join('')}
+    <hr><div class="l tot"><span>TOTAL</span><span>${fmt(v.total)}</span></div>
+    <div>Pago: ${esc(v.medio_pago || '')}</div>
+    ${v.anulada ? '<div class="c tot">*** ANULADA ***</div>' : ''}
+    <hr><div class="c">${esc(CONFIG.PIE_RECIBO).replace(/\n/g,'<br>')}</div>
+  </div>`, 'ticket');
+}
+
+/* ============ ARTÍCULOS ============ */
+function sugerirCodigo(){
+  const nums = items.map(i => parseInt(i.codigo, 10)).filter(n => !isNaN(n));
+  return String(Math.max(1000, ...nums) + 1);
+}
+function limpiarForm(){
+  editando = null; $('#fNombre').value = ''; $('#fPrecio').value = ''; $('#fCodigo').value = sugerirCodigo();
+  $('#formTit').textContent = 'Nuevo artículo'; $('#fCancelar').style.display = 'none';
+}
+function renderItems(){
+  $('#tItems').innerHTML = activos().map(i => `<tr>
+    <td>${esc(i.codigo)}</td><td>${esc(i.nombre)}</td><td class="num">${fmt(i.precio)}</td>
+    <td class="num"><button class="btn" data-ed="${i.id}" style="padding:4px 10px">Editar</button>
+    <button class="btn danger" data-rm="${i.id}" style="padding:4px 10px">Borrar</button></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">Sin artículos todavía.</td></tr>';
+  renderQuick();
+}
+$('#tItems').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const it = items.find(i => String(i.id) === (b.dataset.ed || b.dataset.rm));
+  if (b.dataset.ed){
+    editando = it; $('#fNombre').value = it.nombre; $('#fPrecio').value = it.precio; $('#fCodigo').value = it.codigo;
+    $('#formTit').textContent = 'Editar artículo'; $('#fCancelar').style.display = '';
+    $('#fNombre').focus();
+  } else if (confirm(`¿Borrar "${it.nombre}"? Las ventas ya hechas no se pierden.`)){
+    try{ await DB.saveItem({...it, activo: false, codigo: it.codigo + '-borrado-' + Date.now()}); await cargarItems(); }
+    catch(err){ alert(err.message || err); }
+  }
+});
+$('#fCancelar').onclick = limpiarForm;
+$('#fGuardar').onclick = async () => {
+  const nombre = $('#fNombre').value.trim(), precio = Math.round(Number($('#fPrecio').value)), codigo = $('#fCodigo').value.trim();
+  if (!nombre || !precio || precio <= 0 || !codigo){ $('#fMsg').innerHTML = '<span class="err">Completá nombre, precio y código.</span>'; return; }
+  if (!/^[0-9A-Za-z-]+$/.test(codigo)){ $('#fMsg').innerHTML = '<span class="err">El código solo puede tener números, letras o guiones.</span>'; return; }
+  try{
+    await DB.saveItem({...(editando || {}), nombre, precio, codigo, activo: true});
+    $('#fMsg').innerHTML = `<span class="okc">Guardado: ${esc(nombre)}</span>`;
+    await cargarItems(); limpiarForm();
+  }catch(err){ $('#fMsg').innerHTML = `<span class="err">${esc(err.message || err)}</span>`; }
+};
+async function cargarItems(){
+  try{ items = await DB.listItems(); }catch(err){ alert('Error cargando artículos: ' + (err.message || err)); }
+  renderItems();
+}
+
+/* ============ ETIQUETAS ============ */
+function renderEtq(){
+  const prev = {}; document.querySelectorAll('#tEtq input').forEach(i => prev[i.dataset.c] = i.value);
+  $('#tEtq').innerHTML = activos().map(i => `<tr><td>${esc(i.nombre)} <span class="muted">${esc(i.codigo)}</span></td>
+    <td class="num">${fmt(i.precio)}</td><td><input type="number" min="0" value="${prev[i.codigo] || 0}" data-c="${esc(i.codigo)}" style="width:90px"></td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted">Primero cargá artículos.</td></tr>';
+}
+function armarEtiquetas(){
+  const conPrecio = $('#etqPrecio').checked, cont = $('#etqPreview'); cont.innerHTML = '';
+  document.querySelectorAll('#tEtq input').forEach(inp => {
+    const it = activos().find(i => i.codigo === inp.dataset.c), n = Math.min(500, +inp.value || 0);
+    for (let k = 0; k < n; k++){
+      const d = document.createElement('div'); d.className = 'lbl';
+      d.innerHTML = `<div class="s">${esc(CONFIG.NOMBRE_LOCAL)}</div><div class="n">${esc(it.nombre)}</div>${conPrecio ? `<div class="p">${fmt(it.precio)}</div>` : ''}<svg></svg>`;
+      cont.appendChild(d);
+      JsBarcode(d.querySelector('svg'), it.codigo, {format: 'CODE128', width: 2, height: 40, fontSize: 12, margin: 0, displayValue: true});
+    }
+  });
+  return cont.children.length;
+}
+$('#etqPrev').onclick = () => { if (!armarEtiquetas()) alert('Poné la cantidad de etiquetas en al menos un artículo.'); };
+$('#etqPrint').onclick = () => {
+  if (!armarEtiquetas()) return alert('Poné la cantidad de etiquetas en al menos un artículo.');
+  imprimir(`<div class="labels">${$('#etqPreview').innerHTML}</div>`, 'etiquetas');
+};
+
+/* ============ VENTAS ============ */
+let ventasMes = [];
+$('#dia').value = ymd(new Date());
+$('#dia').onchange = cargarVentas;
+$('#hoyBtn').onclick = () => { $('#dia').value = ymd(new Date()); cargarVentas(); };
+
+function diaSel(){ const [y,m,d] = $('#dia').value.split('-').map(Number); return new Date(y, m-1, d); }
+
+async function cargarVentas(){
+  const d = diaSel(), ini = new Date(d.getFullYear(), d.getMonth(), 1), fin = new Date(d.getFullYear(), d.getMonth()+1, 1);
+  try{ ventasMes = await DB.listSales(ini, fin); }catch(err){ return alert('Error cargando ventas: ' + (err.message || err)); }
+  const fd = new Date(d.getTime() + 864e5);
+  const delDia = ventasMes.filter(v => { const f = new Date(v.fecha); return f >= d && f < fd; });
+  const okDia = delDia.filter(v => !v.anulada), okMes = ventasMes.filter(v => !v.anulada);
+  const suma = a => a.reduce((s,v) => s + Number(v.total), 0);
+
+  $('#lblDia').textContent = d.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'});
+  $('#lblMes').textContent = 'Total de ' + d.toLocaleDateString('es-AR', {month:'long', year:'numeric'});
+  $('#sDia').textContent = fmt(suma(okDia)); $('#sDiaN').textContent = `${okDia.length} ventas`;
+  $('#sMes').textContent = fmt(suma(okMes)); $('#sMesN').textContent = `${okMes.length} ventas`;
+  $('#sProm').textContent = fmt(okMes.length ? suma(okMes) / okMes.length : 0);
+
+  $('#tVentas').innerHTML = delDia.slice().reverse().map(v => `<tr class="${v.anulada ? 'anulada' : ''}">
+    <td>${pad(v.id)}</td><td>${hora(v.fecha)}</td>
+    <td>${(v.items || []).map(l => `${esc(l.nombre)}${l.cant > 1 ? ' x' + l.cant : ''}`).join(', ')}</td>
+    <td>${esc(v.medio_pago || '')}</td><td class="num">${fmt(v.total)}</td>
+    <td class="num"><button class="btn" data-re="${v.id}" style="padding:4px 10px">Reimprimir</button>
+    ${v.anulada ? '' : `<button class="btn danger" data-an="${v.id}" style="padding:4px 10px">Anular</button>`}</td></tr>`).join('')
+    || '<tr><td colspan="6" class="muted">Sin ventas ese día.</td></tr>';
+
+  const porItem = {}, porMedio = {};
+  okMes.forEach(v => {
+    (v.items || []).forEach(l => { const k = l.nombre; porItem[k] ??= {u:0, t:0}; porItem[k].u += l.cant; porItem[k].t += l.cant * l.precio; });
+    const m = v.medio_pago || '-'; porMedio[m] ??= {n:0, t:0}; porMedio[m].n++; porMedio[m].t += Number(v.total);
+  });
+  $('#tPorItem').innerHTML = Object.entries(porItem).sort((a,b) => b[1].t - a[1].t)
+    .map(([k,x]) => `<tr><td>${esc(k)}</td><td class="num">${x.u}</td><td class="num">${fmt(x.t)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">—</td></tr>';
+  $('#tPorMedio').innerHTML = Object.entries(porMedio).sort((a,b) => b[1].t - a[1].t)
+    .map(([k,x]) => `<tr><td>${esc(k)}</td><td class="num">${x.n}</td><td class="num">${fmt(x.t)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">—</td></tr>';
+}
+
+$('#tVentas').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const v = ventasMes.find(x => String(x.id) === (b.dataset.re || b.dataset.an));
+  if (b.dataset.re) imprimirTicket(v);
+  else if (confirm(`¿Anular la venta N° ${pad(v.id)} de ${fmt(v.total)}?`)){
+    try{ await DB.voidSale(v.id); await cargarVentas(); actualizarHoy(); }catch(err){ alert(err.message || err); }
+  }
+});
+
+$('#csvBtn').onclick = () => {
+  const filas = [['N°','Fecha','Hora','Artículos','Medio de pago','Total','Anulada']].concat(
+    ventasMes.map(v => [pad(v.id), new Date(v.fecha).toLocaleDateString('es-AR'), hora(v.fecha),
+      (v.items || []).map(l => `${l.nombre} x${l.cant}`).join(' | '), v.medio_pago || '', Math.round(v.total), v.anulada ? 'SI' : '']));
+  const csv = '\ufeff' + filas.map(f => f.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));
+  const d = diaSel(); a.download = `ventas-lilen-${d.getFullYear()}-${pad(d.getMonth()+1,2)}.csv`; a.click();
+};
+
+/* ============ INICIO / LOGIN ============ */
+async function arrancar(){
+  await cargarItems(); limpiarForm(); renderCart(); actualizarHoy(); $('#scan').focus();
+}
+async function init(){
+  if (!usaSupabase){
+    $('#bannerLocal').style.display = 'block'; $('#modo').textContent = 'Modo local';
+    return arrancar();
+  }
+  $('#modo').textContent = 'En la nube';
+  const {data:{session}} = await sb.auth.getSession();
+  if (session){ $('#logout').style.display = ''; return arrancar(); }
+  $('#login').style.display = 'flex'; $('#lEmail').focus();
+}
+$('#lBtn').onclick = async () => {
+  const {error} = await sb.auth.signInWithPassword({email: $('#lEmail').value.trim(), password: $('#lPass').value});
+  if (error){ $('#lMsg').textContent = 'Email o contraseña incorrectos.'; return; }
+  $('#login').style.display = 'none'; $('#logout').style.display = ''; arrancar();
+};
+$('#lPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('#lBtn').click(); });
+$('#logout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+init();
+</script>
+</body>
+</html>
