@@ -574,6 +574,34 @@ $('#csvBtn').onclick = () => {
 /* ============ INICIO / LOGIN ============ */
 async function arrancar(){
   await cargarItems(); limpiarForm(); renderCart(); actualizarHoy(); $('#scan').focus();
+  escucharCambios();
+}
+
+/* ============ TIEMPO REAL ============
+   Cuando otra PC vende o cambia un artículo, esta pantalla se actualiza sola. */
+let refrescoPend = null;
+function refrescar(){
+  clearTimeout(refrescoPend);
+  refrescoPend = setTimeout(async () => {
+    const enForm = editando || $('#fNombre').value || $('#fPrecio').value;
+    await cargarItems();
+    if (!enForm) limpiarForm();
+    if ($('#etiquetas').classList.contains('on')) renderEtq();
+    actualizarHoy();
+    if ($('#ventas').classList.contains('on')) cargarVentas();
+  }, 400);
+}
+function escucharCambios(){
+  if (!usaSupabase) return;
+  sb.channel('caja')
+    .on('postgres_changes', {event: '*', schema: 'public', table: 'articulos'}, refrescar)
+    .on('postgres_changes', {event: '*', schema: 'public', table: 'ventas'}, refrescar)
+    .subscribe(estado => {
+      $('#modo').textContent = estado === 'SUBSCRIBED' ? '● En vivo' : 'En la nube';
+    });
+  // Por si se corta la conexión: al volver a la pestaña y cada 2 minutos
+  window.addEventListener('focus', refrescar);
+  setInterval(refrescar, 120000);
 }
 async function init(){
   if (!usaSupabase){
