@@ -58,11 +58,13 @@ td.num,th.num{text-align:right}
 .anulada td{text-decoration:line-through;color:var(--muted)}
 /* Etiquetas */
 .labels{display:flex;flex-wrap:wrap;gap:4mm}
-.lbl{width:50mm;height:30mm;border:1px dashed #bbb;padding:1.5mm;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;background:#fff;color:#000;font-family:Arial,sans-serif}
-.lbl .s{font-size:8pt;letter-spacing:1px;font-weight:700}
-.lbl .n{font-size:8pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.lbl{width:50mm;height:25mm;border:1px dashed #bbb;padding:1mm 1.5mm;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3mm;overflow:hidden;background:#fff;color:#000;font-family:Arial,sans-serif;line-height:1.1}
+.lbl .n{font-size:7.5pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.lbl .n b{letter-spacing:1px}
 .lbl .p{font-size:12pt;font-weight:700}
-.lbl svg{max-width:100%;height:12mm}
+.lbl svg{max-width:100%;height:11mm}
+.labels.rollo{gap:0}
+@media print{.labels.rollo .lbl{break-after:page;page-break-after:always}.labels.rollo .lbl:last-child{break-after:auto;page-break-after:auto}}
 /* Login */
 #login{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:10}
 #login .card{width:320px}
@@ -73,7 +75,7 @@ td.num,th.num{text-align:right}
   body>*:not(#printArea){display:none!important}
   #printArea{display:block!important}
   body{background:#fff}
-  .lbl{border:none}
+  .lbl{border:none!important}
 }
 .tk{font-family:'Courier New',monospace;font-size:11pt;color:#000;padding:3mm;width:100%}
 .tk .c{text-align:center}.tk .h{font-size:16pt;font-weight:700;letter-spacing:2px}
@@ -204,11 +206,15 @@ const CONFIG = {
       <h2>¿Cuántas etiquetas de cada uno?</h2>
       <table><thead><tr><th>Artículo</th><th class="num">Precio</th><th>Cantidad</th></tr></thead><tbody id="tEtq"></tbody></table>
       <div class="row" style="margin-top:12px">
+        <select id="etqFormato">
+          <option value="rollo">Rollo 50 × 25 mm (impresora de etiquetas)</option>
+          <option value="a4">Hoja A4 (impresora común)</option>
+        </select>
         <label><input type="checkbox" id="etqPrecio" checked> Mostrar precio en la etiqueta</label>
         <button class="btn" id="etqPrev">Vista previa</button>
         <button class="btn pri" id="etqPrint">Imprimir etiquetas</button>
       </div>
-      <p class="muted" style="font-size:13px">Etiquetas de 50 × 30 mm en hoja A4 (para recortar o en hoja autoadhesiva).</p>
+      <p class="muted" style="font-size:13px">Rollo: una etiqueta por pegatina. En la ventana de impresión elegí la Xprinter, márgenes "Ninguno" y escala 100%.</p>
     </div>
     <div class="card"><div id="etqPreview" class="labels"></div></div>
   </section>
@@ -405,7 +411,7 @@ function imprimir(html, tipo){
   const area = $('#printArea'); area.innerHTML = html;
   $('#pageStyle').textContent = tipo === 'ticket'
     ? `@page{size:${CONFIG.ANCHO_TICKET_MM}mm auto;margin:0}`
-    : '@page{size:A4;margin:8mm}';
+    : tipo === 'rollo' ? '@page{size:50mm 25mm;margin:0}' : '@page{size:A4;margin:8mm}';
   setTimeout(() => window.print(), 80);
 }
 
@@ -477,21 +483,24 @@ function renderEtq(){
 }
 function armarEtiquetas(){
   const conPrecio = $('#etqPrecio').checked, cont = $('#etqPreview'); cont.innerHTML = '';
+  try{ localStorage.setItem('lilen_etq_formato', $('#etqFormato').value); }catch{}
   document.querySelectorAll('#tEtq input').forEach(inp => {
     const it = activos().find(i => i.codigo === inp.dataset.c), n = Math.min(500, +inp.value || 0);
     for (let k = 0; k < n; k++){
       const d = document.createElement('div'); d.className = 'lbl';
-      d.innerHTML = `<div class="s">${esc(CONFIG.NOMBRE_LOCAL)}</div><div class="n">${esc(it.nombre)}</div>${conPrecio ? `<div class="p">${fmt(it.precio)}</div>` : ''}<svg></svg>`;
+      d.innerHTML = `<div class="n"><b>${esc(CONFIG.NOMBRE_LOCAL)}</b> · ${esc(it.nombre)}</div>${conPrecio ? `<div class="p">${fmt(it.precio)}</div>` : ''}<svg></svg>`;
       cont.appendChild(d);
-      JsBarcode(d.querySelector('svg'), it.codigo, {format: 'CODE128', width: 2, height: 40, fontSize: 12, margin: 0, displayValue: true});
+      JsBarcode(d.querySelector('svg'), it.codigo, {format: 'CODE128', width: 2, height: 40, fontSize: 14, textMargin: 0, margin: 0, displayValue: true});
     }
   });
   return cont.children.length;
 }
+try{ const f = localStorage.getItem('lilen_etq_formato'); if (f) $('#etqFormato').value = f; }catch{}
 $('#etqPrev').onclick = () => { if (!armarEtiquetas()) alert('Poné la cantidad de etiquetas en al menos un artículo.'); };
 $('#etqPrint').onclick = () => {
   if (!armarEtiquetas()) return alert('Poné la cantidad de etiquetas en al menos un artículo.');
-  imprimir(`<div class="labels">${$('#etqPreview').innerHTML}</div>`, 'etiquetas');
+  const f = $('#etqFormato').value;
+  imprimir(`<div class="labels ${f}">${$('#etqPreview').innerHTML}</div>`, f);
 };
 
 /* ============ VENTAS ============ */
