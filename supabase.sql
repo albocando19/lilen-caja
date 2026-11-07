@@ -26,3 +26,5 @@ alter table ventas    enable row level security;
 
 create policy "caja articulos" on articulos for all to authenticated using (true) with check (true);
 create policy "caja ventas"    on ventas    for all to authenticated using (true) with check (true);
+
+revoke all on articulos, ventas from anon;
