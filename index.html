@@ -77,7 +77,9 @@ td.num,th.num{text-align:right}
   body{background:#fff}
   .lbl{border:none!important}
 }
-.tk{font-family:'Courier New',monospace;font-size:11pt;color:#000;padding:3mm;width:100%}
+.tk{font-family:'Courier New',monospace;font-size:11pt;color:#000;padding:2mm 1.5mm;width:100%;line-height:1.25}
+.tk.angosto{font-size:8.5pt}.tk.angosto .h{font-size:13pt}.tk.angosto .tot{font-size:11pt}
+.tk .l span:last-child{white-space:nowrap}
 .tk .c{text-align:center}.tk .h{font-size:16pt;font-weight:700;letter-spacing:2px}
 .tk hr{border:none;border-top:1px dashed #000;margin:2mm 0}
 .tk .l{display:flex;justify-content:space-between;gap:4px}
@@ -409,15 +411,21 @@ async function actualizarHoy(){
 /* ============ IMPRESIÓN ============ */
 function imprimir(html, tipo){
   const area = $('#printArea'); area.innerHTML = html;
-  $('#pageStyle').textContent = tipo === 'ticket'
-    ? `@page{size:${CONFIG.ANCHO_TICKET_MM}mm auto;margin:0}`
-    : tipo === 'rollo' ? '@page{size:50mm 25mm;margin:0}' : '@page{size:A4;margin:8mm}';
+  if (tipo === 'ticket'){
+    // Medimos el ticket para que la hoja tenga el largo justo y no gaste rollo de más
+    area.style.cssText = `display:block;position:absolute;left:-9999px;top:0;width:${CONFIG.ANCHO_TICKET_MM}mm`;
+    const altoMm = Math.ceil(area.offsetHeight * 25.4 / 96) + 8;
+    area.style.cssText = '';
+    $('#pageStyle').textContent = `@page{size:${CONFIG.ANCHO_TICKET_MM}mm ${altoMm}mm;margin:0}`;
+  } else {
+    $('#pageStyle').textContent = tipo === 'rollo' ? '@page{size:50mm 25mm;margin:0}' : '@page{size:A4;margin:8mm}';
+  }
   setTimeout(() => window.print(), 80);
 }
 
 function imprimirTicket(v){
   const items = v.items || [];
-  imprimir(`<div class="tk">
+  imprimir(`<div class="tk ${CONFIG.ANCHO_TICKET_MM < 70 ? 'angosto' : ''}">
     <div class="c h">${esc(CONFIG.NOMBRE_LOCAL)}</div>
     <div class="c">${esc(CONFIG.SUBTITULO)}</div><hr>
     <div>Recibo N° ${pad(v.id)}</div><div>${fechaHora(v.fecha)}</div><hr>
