@@ -44,7 +44,7 @@ alter table public.ventas add column if not exists vendedor text default lower(a
 
 drop policy if exists "caja articulos" on public.articulos;
 create policy "articulos leer" on public.articulos for select to authenticated using (true);
-create policy "articulos admin insert" on public.articulos for insert to authenticated with check (public.es_admin());
+create policy "articulos crear" on public.articulos for insert to authenticated with check (true);
 create policy "articulos admin update" on public.articulos for update to authenticated using (public.es_admin()) with check (public.es_admin());
 create policy "articulos admin delete" on public.articulos for delete to authenticated using (public.es_admin());
 

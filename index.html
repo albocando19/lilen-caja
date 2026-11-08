@@ -109,7 +109,7 @@ const CONFIG = {
   <nav>
     <button data-t="caja" class="on">Caja</button>
     <button data-t="ventas" class="soloAdmin" hidden>Ventas</button>
-    <button data-t="articulos" class="soloAdmin" hidden>Artículos</button>
+    <button data-t="articulos">Artículos</button>
     <button data-t="etiquetas">Etiquetas</button>
   </nav>
   <div class="hdr-right"><span id="usuario"></span><span id="modo"></span><button id="logout" style="display:none">Salir</button></div>
@@ -196,6 +196,7 @@ const CONFIG = {
         <button class="btn" id="fCancelar" style="display:none">Cancelar</button>
       </div>
       <div id="fMsg" style="margin-top:8px;font-size:14px"></div>
+      <p id="notaPrecio" class="muted" style="font-size:13px;margin:8px 0 0" hidden>Podés crear artículos nuevos. Para cambiar un precio o borrar un artículo, pedíselo a Ori.</p>
     </div>
     <div class="card">
       <table><thead><tr><th>Código</th><th>Artículo</th><th class="num">Precio</th><th></th></tr></thead><tbody id="tItems"></tbody></table>
@@ -453,8 +454,8 @@ function limpiarForm(){
 function renderItems(){
   $('#tItems').innerHTML = activos().map(i => `<tr>
     <td>${esc(i.codigo)}</td><td>${esc(i.nombre)}</td><td class="num">${fmt(i.precio)}</td>
-    <td class="num"><button class="btn" data-ed="${i.id}" style="padding:4px 10px">Editar</button>
-    <button class="btn danger" data-rm="${i.id}" style="padding:4px 10px">Borrar</button></td></tr>`).join('')
+    <td class="num">${esAdmin ? `<button class="btn" data-ed="${i.id}" style="padding:4px 10px">Editar</button>
+    <button class="btn danger" data-rm="${i.id}" style="padding:4px 10px">Borrar</button>` : ''}</td></tr>`).join('')
     || '<tr><td colspan="4" class="muted">Sin artículos todavía.</td></tr>';
   renderQuick();
 }
@@ -584,6 +585,7 @@ async function cargarRol(){
     esAdmin = !error && data === true;
   }
   document.querySelectorAll('.soloAdmin').forEach(el => el.hidden = !esAdmin);
+  $('#notaPrecio').hidden = esAdmin;
   try{
     const {data:{user}} = usaSupabase ? await sb.auth.getUser() : {data:{user:null}};
     if (user) $('#usuario').textContent = user.email + (esAdmin ? ' · admin' : '');
