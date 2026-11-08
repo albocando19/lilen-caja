@@ -28,3 +28,41 @@ create policy "caja articulos" on articulos for all to authenticated using (true
 create policy "caja ventas"    on ventas    for all to authenticated using (true) with check (true);
 
 revoke all on articulos, ventas from anon;
+
+-- ===== Roles (admins ven ventas y editan artículos; la caja solo cobra) =====
+create table if not exists public.admins (email text primary key);
+alter table public.admins enable row level security;
+revoke all on public.admins from anon, authenticated;
+-- insert into public.admins (email) values ('mail-admin@gmail.com');
+
+create or replace function public.es_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.admins where email = lower(coalesce(auth.jwt() ->> 'email', '')));
+$$;
+
+alter table public.ventas add column if not exists vendedor text default lower(auth.jwt() ->> 'email');
+
+drop policy if exists "caja articulos" on public.articulos;
+create policy "articulos leer" on public.articulos for select to authenticated using (true);
+create policy "articulos admin insert" on public.articulos for insert to authenticated with check (public.es_admin());
+create policy "articulos admin update" on public.articulos for update to authenticated using (public.es_admin()) with check (public.es_admin());
+create policy "articulos admin delete" on public.articulos for delete to authenticated using (public.es_admin());
+
+drop policy if exists "caja ventas" on public.ventas;
+create policy "ventas admin leer" on public.ventas for select to authenticated using (public.es_admin());
+create policy "ventas admin update" on public.ventas for update to authenticated using (public.es_admin()) with check (public.es_admin());
+
+create or replace function public.registrar_venta(p_total numeric, p_medio text, p_items jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v public.ventas;
+begin
+  if auth.uid() is null then raise exception 'No autorizado'; end if;
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+    raise exception 'La venta no tiene artículos';
+  end if;
+  insert into public.ventas (total, medio_pago, items, vendedor)
+  values (p_total, p_medio, p_items, lower(auth.jwt() ->> 'email'))
+  returning * into v;
+  return to_jsonb(v);
+end;
+$$;

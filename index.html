@@ -108,11 +108,11 @@ const CONFIG = {
   <h1>Lilen <span>· Caja</span></h1>
   <nav>
     <button data-t="caja" class="on">Caja</button>
-    <button data-t="ventas">Ventas</button>
-    <button data-t="articulos">Artículos</button>
+    <button data-t="ventas" class="soloAdmin" hidden>Ventas</button>
+    <button data-t="articulos" class="soloAdmin" hidden>Artículos</button>
     <button data-t="etiquetas">Etiquetas</button>
   </nav>
-  <div class="hdr-right"><span id="modo"></span><button id="logout" style="display:none">Salir</button></div>
+  <div class="hdr-right"><span id="usuario"></span><span id="modo"></span><button id="logout" style="display:none">Salir</button></div>
 </header>
 
 <main>
@@ -151,7 +151,7 @@ const CONFIG = {
           <button class="btn pri big" id="cobrar" disabled>Cobrar (F2)</button>
           <button class="btn" id="vaciar" style="width:100%;margin-top:8px">Vaciar venta</button>
         </div>
-        <div class="card">
+        <div class="card soloAdmin" hidden>
           <div class="muted">Vendido hoy</div>
           <div style="font-size:26px;font-weight:700" id="hoyTotal">$ 0</div>
           <div class="muted" id="hoyCant">0 ventas</div>
@@ -174,7 +174,7 @@ const CONFIG = {
     </div>
     <div class="card">
       <h2>Ventas del día</h2>
-      <table><thead><tr><th>N°</th><th>Hora</th><th>Artículos</th><th>Pago</th><th class="num">Total</th><th></th></tr></thead><tbody id="tVentas"></tbody></table>
+      <table><thead><tr><th>N°</th><th>Hora</th><th>Artículos</th><th>Pago</th><th>Cobró</th><th class="num">Total</th><th></th></tr></thead><tbody id="tVentas"></tbody></table>
     </div>
     <div class="caja" style="grid-template-columns:1fr 1fr">
       <div class="card"><h2>Mes por artículo</h2>
@@ -289,7 +289,7 @@ const Remote = {
     return this.norm(data);
   },
   async addSale(s){
-    const {data, error} = await sb.from('ventas').insert({total: s.total, medio_pago: s.medio_pago, items: s.items}).select().single();
+    const {data, error} = await sb.rpc('registrar_venta', {p_total: s.total, p_medio: s.medio_pago, p_items: s.items});
     if (error) throw error; return data;
   },
   async listSales(desde, hasta){
@@ -403,6 +403,7 @@ document.addEventListener('click', e => {
 });
 
 async function actualizarHoy(){
+  if (!esAdmin) return;
   const h = new Date(); const d = new Date(h.getFullYear(), h.getMonth(), h.getDate());
   try{
     const v = (await DB.listSales(d, new Date(d.getTime() + 864e5))).filter(x => !x.anulada);
@@ -539,10 +540,10 @@ async function cargarVentas(){
   $('#tVentas').innerHTML = delDia.slice().reverse().map(v => `<tr class="${v.anulada ? 'anulada' : ''}">
     <td>${pad(v.id)}</td><td>${hora(v.fecha)}</td>
     <td>${(v.items || []).map(l => `${esc(l.nombre)}${l.cant > 1 ? ' x' + l.cant : ''}`).join(', ')}</td>
-    <td>${esc(v.medio_pago || '')}</td><td class="num">${fmt(v.total)}</td>
+    <td>${esc(v.medio_pago || '')}</td><td class="muted">${esc((v.vendedor || '').split('@')[0])}</td><td class="num">${fmt(v.total)}</td>
     <td class="num"><button class="btn" data-re="${v.id}" style="padding:4px 10px">Reimprimir</button>
     ${v.anulada ? '' : `<button class="btn danger" data-an="${v.id}" style="padding:4px 10px">Anular</button>`}</td></tr>`).join('')
-    || '<tr><td colspan="6" class="muted">Sin ventas ese día.</td></tr>';
+    || '<tr><td colspan="7" class="muted">Sin ventas ese día.</td></tr>';
 
   const porItem = {}, porMedio = {};
   okMes.forEach(v => {
@@ -575,10 +576,24 @@ $('#csvBtn').onclick = () => {
 };
 
 /* ============ INICIO / LOGIN ============ */
+let esAdmin = false;
+async function cargarRol(){
+  if (!usaSupabase){ esAdmin = true; }
+  else {
+    const {data, error} = await sb.rpc('es_admin');
+    esAdmin = !error && data === true;
+  }
+  document.querySelectorAll('.soloAdmin').forEach(el => el.hidden = !esAdmin);
+  try{
+    const {data:{user}} = usaSupabase ? await sb.auth.getUser() : {data:{user:null}};
+    if (user) $('#usuario').textContent = user.email + (esAdmin ? ' · admin' : '');
+  }catch{}
+}
 function limpiarScan(){
   const sc = $('#scan'); sc.readOnly = false; sc.value = ''; sc.focus();
 }
 async function arrancar(){
+  await cargarRol();
   setTimeout(limpiarScan, 300); setTimeout(() => { if (/@/.test($('#scan').value)) $('#scan').value = ''; }, 1500);
   await cargarItems(); limpiarForm(); renderCart(); actualizarHoy(); $('#scan').focus();
   escucharCambios();
