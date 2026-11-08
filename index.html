@@ -125,7 +125,7 @@ const CONFIG = {
     <div class="caja">
       <div>
         <div class="card">
-          <input id="scan" placeholder="Pasá el código de barras (o escribilo y Enter)" autocomplete="off">
+          <input id="scan" name="codigo-barras" type="search" inputmode="numeric" placeholder="Pasá el código de barras (o escribilo y Enter)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other" readonly>
           <div id="scanMsg"></div>
         </div>
         <div class="card">
@@ -226,9 +226,11 @@ const CONFIG = {
 <div id="login">
   <div class="card">
     <h2>Ingresar a la caja</h2>
-    <input id="lEmail" type="email" placeholder="Email">
-    <input id="lPass" type="password" placeholder="Contraseña">
-    <button class="btn pri big" id="lBtn">Entrar</button>
+    <form id="lForm" autocomplete="on">
+      <input id="lEmail" name="email" type="email" placeholder="Email" autocomplete="username">
+      <input id="lPass" name="password" type="password" placeholder="Contraseña" autocomplete="current-password">
+      <button class="btn pri big" id="lBtn" type="submit">Entrar</button>
+    </form>
     <div id="lMsg" class="err" style="margin-top:8px;font-size:14px"></div>
   </div>
 </div>
@@ -573,7 +575,11 @@ $('#csvBtn').onclick = () => {
 };
 
 /* ============ INICIO / LOGIN ============ */
+function limpiarScan(){
+  const sc = $('#scan'); sc.readOnly = false; sc.value = ''; sc.focus();
+}
 async function arrancar(){
+  setTimeout(limpiarScan, 300); setTimeout(() => { if (/@/.test($('#scan').value)) $('#scan').value = ''; }, 1500);
   await cargarItems(); limpiarForm(); renderCart(); actualizarHoy(); $('#scan').focus();
   escucharCambios();
 }
@@ -614,12 +620,12 @@ async function init(){
   if (session){ $('#logout').style.display = ''; return arrancar(); }
   $('#login').style.display = 'flex'; $('#lEmail').focus();
 }
-$('#lBtn').onclick = async () => {
+$('#lForm').onsubmit = async e => {
+  e.preventDefault();
   const {error} = await sb.auth.signInWithPassword({email: $('#lEmail').value.trim(), password: $('#lPass').value});
   if (error){ $('#lMsg').textContent = 'Email o contraseña incorrectos.'; return; }
   $('#login').style.display = 'none'; $('#logout').style.display = ''; arrancar();
 };
-$('#lPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('#lBtn').click(); });
 $('#logout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
 init();
