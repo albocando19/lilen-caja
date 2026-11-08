@@ -38,6 +38,9 @@ th{font-size:13px;color:var(--muted);font-weight:600}
 td.num,th.num{text-align:right}
 .muted{color:var(--muted)}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.aviso{display:none;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:15px;font-weight:600}
+.aviso.off{display:block;background:#fde8e6;border:1px solid #f1a9a2;color:#8c1d14}
+.aviso.sub{display:block;background:#e7f1fb;border:1px solid #a9c8ea;color:#1d4f8c}
 .banner{padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:14px;background:#fff4d6;border:1px solid #f0d58a}
 /* Caja */
 .caja{display:grid;grid-template-columns:1fr 360px;gap:16px}
@@ -116,6 +119,7 @@ const CONFIG = {
 </header>
 
 <main>
+  <div id="avisoConexion" class="aviso"></div>
   <div id="bannerLocal" class="banner" style="display:none">
     Modo local: las ventas se guardan solo en esta computadora. Para compartirlas entre las 3 PCs, configurá Supabase en el archivo.
   </div>
@@ -303,7 +307,10 @@ const Remote = {
     return this.norm(data);
   },
   async addSale(s){
-    const {data, error} = await sb.rpc('registrar_venta', {p_total: s.total, p_medio: s.medio_pago, p_items: s.items});
+    const {data, error} = await sb.rpc('registrar_venta', {
+      p_total: s.total, p_medio: s.medio_pago, p_items: s.items,
+      p_cliente_id: s.cliente_id || null, p_fecha: s.fecha || null,
+    }).abortSignal(AbortSignal.timeout(8000));
     if (error) throw error; return data;
   },
   async listSales(desde, hasta){
@@ -405,11 +412,24 @@ let cobrando = false;
 async function cobrar(){
   if (!cart.length || cobrando) return;
   cobrando = true; $('#cobrar').disabled = true;
+  const nueva = {
+    total: totalCart(), medio_pago: $('#medio').value, items: cart.map(l => ({...l})),
+    cliente_id: nuevoId(), fecha: new Date().toISOString(),
+  };
   try{
-    const venta = await DB.addSale({total: totalCart(), medio_pago: $('#medio').value, items: cart.map(l => ({...l}))});
+    let venta;
+    const sinRed = usaSupabase && (!navigator.onLine || Cola.leer().length);  // si hay pendientes, va a la cola para respetar el orden
+    if (sinRed) venta = Cola.agregar(nueva);
+    else {
+      try{ venta = await DB.addSale(nueva); }
+      catch(err){ if (usaSupabase && esErrorDeRed(err)) venta = Cola.agregar(nueva); else throw err; }
+    }
     if ($('#imprimirChk').checked) imprimirTicket(venta);
-    $('#scanMsg').innerHTML = `<span class="okc">Venta N° ${venta.id} guardada · ${fmt(venta.total)}</span>`;
-    cart = []; renderCart(); actualizarHoy();
+    $('#scanMsg').innerHTML = venta.provisorio
+      ? `<span class="err">Sin conexión: venta ${venta.provisorio} guardada en esta PC · ${fmt(venta.total)}. Se sube sola cuando vuelva internet.</span>`
+      : `<span class="okc">Venta N° ${venta.id} guardada · ${fmt(venta.total)}</span>`;
+    cart = []; renderCart(); actualizarHoy(); mostrarAviso();
+    if (venta.provisorio) sincronizar();
   }catch(err){
     alert('No se pudo guardar la venta: ' + (err.message || err)); 
   }finally{ cobrando = false; renderCart(); $('#scan').focus(); }
@@ -452,7 +472,7 @@ function imprimirTicket(v){
   imprimir(`<div class="tk ${CONFIG.ANCHO_TICKET_MM < 70 ? 'angosto' : ''}">
     <div class="c h">${esc(CONFIG.NOMBRE_LOCAL)}</div>
     <div class="c">${esc(CONFIG.SUBTITULO)}</div><hr>
-    <div>Recibo N° ${pad(v.id)}</div><div>${fechaHora(v.fecha)}</div><hr>
+    <div>Recibo N° ${v.provisorio ? v.provisorio + ' (provisorio)' : pad(v.id)}</div><div>${fechaHora(v.fecha)}</div><hr>
     ${items.map(l => `<div>${esc(l.nombre)}</div><div class="l"><span>&nbsp;${l.cant} x ${fmt(l.precio)}</span><span>${fmt(l.precio * l.cant)}</span></div>`).join('')}
     <hr><div class="l tot"><span>TOTAL</span><span>${fmt(v.total)}</span></div>
     <div>Pago: ${esc(v.medio_pago || '')}</div>
@@ -502,7 +522,15 @@ $('#fGuardar').onclick = async () => {
   }catch(err){ $('#fMsg').innerHTML = `<span class="err">${esc(err.message || err)}</span>`; }
 };
 async function cargarItems(){
-  try{ items = await DB.listItems(); }catch(err){ alert('Error cargando artículos: ' + (err.message || err)); }
+  try{
+    items = await DB.listItems();
+    if (usaSupabase) try{ localStorage.setItem('lilen_cache_articulos', JSON.stringify(items)); }catch{}
+  }catch(err){
+    // Sin internet: se usa la última lista guardada en esta PC
+    let copia = null; try{ copia = JSON.parse(localStorage.getItem('lilen_cache_articulos')); }catch{}
+    if (copia && copia.length){ if (!items.length) items = copia; }
+    else alert('Error cargando artículos: ' + (err.message || err));
+  }
   renderItems();
 }
 
@@ -622,7 +650,8 @@ async function cargarRol(){
   if (!usaSupabase){ esAdmin = true; }
   else {
     const {data, error} = await sb.rpc('es_admin');
-    esAdmin = !error && data === true;
+    if (!error){ esAdmin = data === true; try{ localStorage.setItem('lilen_es_admin', esAdmin ? '1' : '0'); }catch{} }
+    else { try{ esAdmin = localStorage.getItem('lilen_es_admin') === '1'; }catch{ esAdmin = false; } }
   }
   document.querySelectorAll('.soloAdmin').forEach(el => el.hidden = !esAdmin);
   $('#notaPrecio').hidden = esAdmin;
@@ -638,7 +667,80 @@ async function arrancar(){
   await cargarRol();
   setTimeout(limpiarScan, 300); setTimeout(() => { if (/@/.test($('#scan').value)) $('#scan').value = ''; }, 1500);
   await cargarItems(); limpiarForm(); renderCart(); actualizarHoy(); $('#scan').focus();
-  escucharCambios();
+  escucharCambios(); iniciarSincronizacion();
+}
+
+/* ============ SIN INTERNET ============
+   Si se corta la conexión, las ventas quedan guardadas en esta PC (cola) y se suben
+   solas, en orden, cuando vuelve. Cada venta lleva un código único: si un envío llegó
+   pero no volvió la respuesta, la base la reconoce y no la duplica. */
+function nuevoId(){
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+}
+function esErrorDeRed(err){
+  const m = String((err && (err.message || err.details)) || err || '');
+  return !navigator.onLine || err?.name === 'AbortError' || err?.name === 'TimeoutError'
+    || /fetch|network|Load failed|timeout|timed out|abort|ERR_|NetworkError|conex/i.test(m);
+}
+const Cola = {
+  K: 'lilen_cola_ventas',
+  leer(){ try{ return JSON.parse(localStorage.getItem(this.K)) || []; }catch{ return []; } },
+  guardar(c){ localStorage.setItem(this.K, JSON.stringify(c)); },
+  agregar(v){
+    let n = 1; try{ n = (parseInt(localStorage.getItem('lilen_prov_n'), 10) || 0) + 1; localStorage.setItem('lilen_prov_n', n); }catch{}
+    const item = {...v, provisorio: 'P' + String(n).padStart(4, '0')};
+    const c = this.leer(); c.push(item); this.guardar(c);   // si esto falla, sale el error y la venta NO se da por cobrada
+    return item;
+  },
+  quitar(cliente_id){ this.guardar(this.leer().filter(x => x.cliente_id !== cliente_id)); },
+};
+
+let sincronizando = false, errorSync = '';
+async function sincronizar(){
+  if (!usaSupabase || sincronizando || !navigator.onLine) { mostrarAviso(); return; }
+  const pendientes = Cola.leer(); if (!pendientes.length){ errorSync = ''; mostrarAviso(); return; }
+  sincronizando = true; mostrarAviso();
+  try{
+    for (const v of pendientes){
+      try{
+        await Remote.addSale(v);
+        Cola.quitar(v.cliente_id); errorSync = '';
+      }catch(err){
+        errorSync = esErrorDeRed(err) ? '' : (err.message || String(err));
+        break;   // se reintenta más tarde, respetando el orden
+      }
+      mostrarAviso();
+    }
+  } finally {
+    sincronizando = false; mostrarAviso();
+    if (!Cola.leer().length){ actualizarHoy(); if ($('#ventas').classList.contains('on')) cargarVentas(); }
+  }
+}
+function mostrarAviso(){
+  const el = $('#avisoConexion'); if (!el || !usaSupabase) return;
+  const n = Cola.leer().length, txtN = `${n} venta${n === 1 ? '' : 's'}`;
+  if (!navigator.onLine){
+    el.className = 'aviso off';
+    el.textContent = 'Sin conexión a internet. Podés seguir cobrando: las ventas se guardan en esta PC' + (n ? ` (${txtN} por subir).` : '.');
+  } else if (n){
+    el.className = 'aviso sub';
+    el.textContent = errorSync
+      ? `${txtN} sin subir. No se pudieron enviar: ${errorSync}. Se reintenta solo; si sigue, recargá la página.`
+      : (sincronizando ? `Subiendo ${txtN} hechas sin conexión…` : `${txtN} por subir. Se reintenta en unos segundos…`);
+  } else {
+    el.className = 'aviso'; el.textContent = '';
+  }
+}
+function iniciarSincronizacion(){
+  if (!usaSupabase) return;
+  window.addEventListener('online', () => { mostrarAviso(); setTimeout(sincronizar, 1500); refrescar(true); });
+  window.addEventListener('offline', mostrarAviso);
+  setInterval(() => { if (Cola.leer().length) sincronizar(); }, 20000);
+  // Otra pestaña de esta misma PC subió o agregó ventas
+  window.addEventListener('storage', e => { if (e.key === Cola.K) mostrarAviso(); });
+  window.addEventListener('beforeunload', e => { if (Cola.leer().length && !navigator.onLine){ e.preventDefault(); e.returnValue = ''; } });
+  mostrarAviso(); sincronizar();
 }
 
 /* ============ TIEMPO REAL ============
@@ -686,6 +788,9 @@ async function init(){
   $('#modo').textContent = 'En la nube';
   const {data:{session}} = await sb.auth.getSession();
   if (session){ $('#logout').style.display = ''; return arrancar(); }
+  // Sin internet no se puede renovar la sesión, pero si ya había alguien logueado en esta PC se sigue igual
+  const habiaSesion = Object.keys(localStorage).some(k => /^sb-.*-auth-token$/.test(k));
+  if (!navigator.onLine && habiaSesion){ $('#logout').style.display = ''; return arrancar(); }
   $('#login').style.display = 'flex'; $('#lEmail').focus();
 }
 $('#lForm').onsubmit = async e => {
@@ -694,7 +799,13 @@ $('#lForm').onsubmit = async e => {
   if (error){ $('#lMsg').textContent = 'Email o contraseña incorrectos.'; return; }
   $('#login').style.display = 'none'; $('#logout').style.display = ''; arrancar();
 };
-$('#logout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+$('#logout').onclick = async () => {
+  if (Cola.leer().length){ alert('Hay ventas hechas sin conexión que todavía no se subieron. Esperá a que vuelva internet antes de salir.'); return; }
+  await sb.auth.signOut(); location.reload();
+};
+
+// Guarda la página en la PC para poder abrirla sin internet
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 init();
 </script>

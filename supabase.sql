@@ -80,3 +80,32 @@ language sql stable security invoker set search_path = public as $$
     'por_item', coalesce((select jsonb_agg(jsonb_build_object('nombre', nombre, 'u', u, 't', t) order by t desc) from it), '[]'::jsonb),
     'por_medio', coalesce((select jsonb_agg(jsonb_build_object('medio', medio, 'n', n, 't', t) order by t desc) from me), '[]'::jsonb));
 $$;
+
+-- ===== Ventas hechas sin internet (código único + hora real) =====
+alter table public.ventas add column if not exists cliente_id uuid unique;
+alter table public.ventas add column if not exists subida timestamptz default now();
+drop function if exists public.registrar_venta(numeric, text, jsonb);
+create or replace function public.registrar_venta(
+  p_total numeric, p_medio text, p_items jsonb,
+  p_cliente_id uuid default null, p_fecha timestamptz default null
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v public.ventas;
+begin
+  if auth.uid() is null then raise exception 'No autorizado'; end if;
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+    raise exception 'La venta no tiene artículos';
+  end if;
+  if p_cliente_id is not null then
+    select * into v from public.ventas where cliente_id = p_cliente_id;
+    if found then return to_jsonb(v); end if;
+  end if;
+  insert into public.ventas (total, medio_pago, items, vendedor, cliente_id, fecha)
+  values (p_total, p_medio, p_items, lower(auth.jwt() ->> 'email'), p_cliente_id,
+          case when p_fecha is null or p_fecha > now() or p_fecha < now() - interval '30 days' then now() else p_fecha end)
+  on conflict (cliente_id) do nothing
+  returning * into v;
+  if v.id is null then select * into v from public.ventas where cliente_id = p_cliente_id; end if;
+  return to_jsonb(v);
+end;
+$$;
