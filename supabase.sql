@@ -66,3 +66,17 @@ begin
   return to_jsonb(v);
 end;
 $$;
+
+-- ===== Resumen calculado en la base (ahorra tráfico) =====
+create or replace function public.resumen_ventas(p_desde timestamptz, p_hasta timestamptz) returns jsonb
+language sql stable security invoker set search_path = public as $$
+  with v as (select * from public.ventas where fecha >= p_desde and fecha < p_hasta and not anulada),
+  it as (select l ->> 'nombre' as nombre, sum((l ->> 'cant')::numeric) as u,
+                sum((l ->> 'cant')::numeric * (l ->> 'precio')::numeric) as t
+         from v, jsonb_array_elements(v.items) l group by 1),
+  me as (select coalesce(medio_pago, '-') as medio, count(*) as n, sum(total) as t from v group by 1)
+  select jsonb_build_object(
+    'total', coalesce((select sum(total) from v), 0), 'cantidad', (select count(*) from v),
+    'por_item', coalesce((select jsonb_agg(jsonb_build_object('nombre', nombre, 'u', u, 't', t) order by t desc) from it), '[]'::jsonb),
+    'por_medio', coalesce((select jsonb_agg(jsonb_build_object('medio', medio, 'n', n, 't', t) order by t desc) from me), '[]'::jsonb));
+$$;

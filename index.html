@@ -273,6 +273,19 @@ const Local = {
   },
   async voidSale(id){
     const v = this.get('lilen_ventas'); const x = v.find(x => x.id === id); if (x) x.anulada = true; this.set('lilen_ventas', v);
+  },
+  async resumen(desde, hasta){
+    const ok = (await this.listSales(desde, hasta)).filter(v => !v.anulada);
+    const it = {}, me = {};
+    ok.forEach(v => {
+      (v.items || []).forEach(l => { it[l.nombre] ??= {u:0, t:0}; it[l.nombre].u += l.cant; it[l.nombre].t += l.cant * l.precio; });
+      const m = v.medio_pago || '-'; me[m] ??= {n:0, t:0}; me[m].n++; me[m].t += Number(v.total);
+    });
+    return {
+      total: ok.reduce((s,v) => s + Number(v.total), 0), cantidad: ok.length,
+      por_item: Object.entries(it).map(([nombre,x]) => ({nombre, ...x})).sort((a,b) => b.t - a.t),
+      por_medio: Object.entries(me).map(([medio,x]) => ({medio, ...x})).sort((a,b) => b.t - a.t),
+    };
   }
 };
 
@@ -309,6 +322,12 @@ const Remote = {
   async voidSale(id){
     const {error} = await sb.from('ventas').update({anulada: true}).eq('id', id);
     if (error) throw error;
+  },
+  // La base suma y agrupa; viaja un resumen chico en vez de todas las ventas
+  async resumen(desde, hasta){
+    const {data, error} = await sb.rpc('resumen_ventas', {p_desde: desde.toISOString(), p_hasta: hasta.toISOString()});
+    if (error) throw error;
+    return {...data, total: Number(data.total), cantidad: Number(data.cantidad)};
   }
 };
 const DB = usaSupabase ? Remote : Local;
@@ -407,9 +426,9 @@ async function actualizarHoy(){
   if (!esAdmin) return;
   const h = new Date(); const d = new Date(h.getFullYear(), h.getMonth(), h.getDate());
   try{
-    const v = (await DB.listSales(d, new Date(d.getTime() + 864e5))).filter(x => !x.anulada);
-    $('#hoyTotal').textContent = fmt(v.reduce((s,x) => s + Number(x.total), 0));
-    $('#hoyCant').textContent = `${v.length} venta${v.length === 1 ? '' : 's'}`;
+    const r = await DB.resumen(d, new Date(d.getTime() + 864e5));
+    $('#hoyTotal').textContent = fmt(r.total);
+    $('#hoyCant').textContent = `${r.cantidad} venta${r.cantidad === 1 ? '' : 's'}`;
   }catch{}
 }
 
@@ -516,64 +535,85 @@ $('#etqPrint').onclick = () => {
   imprimir(`<div class="labels ${f}">${$('#etqPreview').innerHTML}</div>`, f);
 };
 
-/* ============ VENTAS ============ */
-let ventasMes = [];
+/* ============ VENTAS ============
+   Se bajan solo las ventas del día elegido. Los totales del mes los calcula la base
+   y llega un resumen chico, así no se gasta el tráfico del plan gratis. */
+let ventasDia = [];
 $('#dia').value = ymd(new Date());
 $('#dia').onchange = cargarVentas;
 $('#hoyBtn').onclick = () => { $('#dia').value = ymd(new Date()); cargarVentas(); };
 
 function diaSel(){ const [y,m,d] = $('#dia').value.split('-').map(Number); return new Date(y, m-1, d); }
+function rangoDia(){ const d = diaSel(); return [d, new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)]; }
+function rangoMes(){ const d = diaSel(); return [new Date(d.getFullYear(), d.getMonth(), 1), new Date(d.getFullYear(), d.getMonth() + 1, 1)]; }
 
 async function cargarVentas(){
-  const d = diaSel(), ini = new Date(d.getFullYear(), d.getMonth(), 1), fin = new Date(d.getFullYear(), d.getMonth()+1, 1);
-  try{ ventasMes = await DB.listSales(ini, fin); }catch(err){ return alert('Error cargando ventas: ' + (err.message || err)); }
-  const fd = new Date(d.getTime() + 864e5);
-  const delDia = ventasMes.filter(v => { const f = new Date(v.fecha); return f >= d && f < fd; });
-  const okDia = delDia.filter(v => !v.anulada), okMes = ventasMes.filter(v => !v.anulada);
-  const suma = a => a.reduce((s,v) => s + Number(v.total), 0);
+  const [d, fd] = rangoDia();
+  try{ ventasDia = await DB.listSales(d, fd); }catch(err){ return alert('Error cargando ventas: ' + (err.message || err)); }
+  renderDia(); cargarResumenMes();
+}
 
+function renderDia(){
+  const d = diaSel(), ok = ventasDia.filter(v => !v.anulada);
   $('#lblDia').textContent = d.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'});
-  $('#lblMes').textContent = 'Total de ' + d.toLocaleDateString('es-AR', {month:'long', year:'numeric'});
-  $('#sDia').textContent = fmt(suma(okDia)); $('#sDiaN').textContent = `${okDia.length} ventas`;
-  $('#sMes').textContent = fmt(suma(okMes)); $('#sMesN').textContent = `${okMes.length} ventas`;
-  $('#sProm').textContent = fmt(okMes.length ? suma(okMes) / okMes.length : 0);
-
-  $('#tVentas').innerHTML = delDia.slice().reverse().map(v => `<tr class="${v.anulada ? 'anulada' : ''}">
+  $('#sDia').textContent = fmt(ok.reduce((s,v) => s + Number(v.total), 0)); $('#sDiaN').textContent = `${ok.length} ventas`;
+  $('#tVentas').innerHTML = ventasDia.slice().sort((a,b) => b.id - a.id).map(v => `<tr class="${v.anulada ? 'anulada' : ''}">
     <td>${pad(v.id)}</td><td>${hora(v.fecha)}</td>
     <td>${(v.items || []).map(l => `${esc(l.nombre)}${l.cant > 1 ? ' x' + l.cant : ''}`).join(', ')}</td>
     <td>${esc(v.medio_pago || '')}</td><td class="muted">${esc((v.vendedor || '').split('@')[0])}</td><td class="num">${fmt(v.total)}</td>
     <td class="num"><button class="btn" data-re="${v.id}" style="padding:4px 10px">Reimprimir</button>
     ${v.anulada ? '' : `<button class="btn danger" data-an="${v.id}" style="padding:4px 10px">Anular</button>`}</td></tr>`).join('')
     || '<tr><td colspan="7" class="muted">Sin ventas ese día.</td></tr>';
+}
 
-  const porItem = {}, porMedio = {};
-  okMes.forEach(v => {
-    (v.items || []).forEach(l => { const k = l.nombre; porItem[k] ??= {u:0, t:0}; porItem[k].u += l.cant; porItem[k].t += l.cant * l.precio; });
-    const m = v.medio_pago || '-'; porMedio[m] ??= {n:0, t:0}; porMedio[m].n++; porMedio[m].t += Number(v.total);
-  });
-  $('#tPorItem').innerHTML = Object.entries(porItem).sort((a,b) => b[1].t - a[1].t)
-    .map(([k,x]) => `<tr><td>${esc(k)}</td><td class="num">${x.u}</td><td class="num">${fmt(x.t)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">—</td></tr>';
-  $('#tPorMedio').innerHTML = Object.entries(porMedio).sort((a,b) => b[1].t - a[1].t)
-    .map(([k,x]) => `<tr><td>${esc(k)}</td><td class="num">${x.n}</td><td class="num">${fmt(x.t)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">—</td></tr>';
+async function cargarResumenMes(){
+  const [ini, fin] = rangoMes();
+  let r; try{ r = await DB.resumen(ini, fin); }catch(err){ return; }
+  $('#lblMes').textContent = 'Total de ' + ini.toLocaleDateString('es-AR', {month:'long', year:'numeric'});
+  $('#sMes').textContent = fmt(r.total); $('#sMesN').textContent = `${r.cantidad} ventas`;
+  $('#sProm').textContent = fmt(r.cantidad ? r.total / r.cantidad : 0);
+  $('#tPorItem').innerHTML = (r.por_item || []).map(x => `<tr><td>${esc(x.nombre)}</td><td class="num">${Number(x.u)}</td><td class="num">${fmt(x.t)}</td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted">—</td></tr>';
+  $('#tPorMedio').innerHTML = (r.por_medio || []).map(x => `<tr><td>${esc(x.medio)}</td><td class="num">${Number(x.n)}</td><td class="num">${fmt(x.t)}</td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted">—</td></tr>';
+}
+
+// Llega una venta nueva o anulada por tiempo real: se suma a la lista sin volver a bajar todo
+function ventaCambio(fila){
+  if (!fila || !fila.id) return;
+  const [d, fd] = rangoDia(), f = new Date(fila.fecha);
+  if (f >= d && f < fd){
+    const v = {...fila, total: Number(fila.total)}, i = ventasDia.findIndex(x => x.id === v.id);
+    if (i >= 0) ventasDia[i] = v; else ventasDia.push(v);
+    renderDia();
+  }
+  clearTimeout(ventaCambio.t); ventaCambio.t = setTimeout(cargarResumenMes, 1500);
 }
 
 $('#tVentas').addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b) return;
-  const v = ventasMes.find(x => String(x.id) === (b.dataset.re || b.dataset.an));
+  const v = ventasDia.find(x => String(x.id) === (b.dataset.re || b.dataset.an));
   if (b.dataset.re) imprimirTicket(v);
   else if (confirm(`¿Anular la venta N° ${pad(v.id)} de ${fmt(v.total)}?`)){
-    try{ await DB.voidSale(v.id); await cargarVentas(); actualizarHoy(); }catch(err){ alert(err.message || err); }
+    try{ await DB.voidSale(v.id); v.anulada = true; renderDia(); cargarResumenMes(); actualizarHoy(); }catch(err){ alert(err.message || err); }
   }
 });
 
-$('#csvBtn').onclick = () => {
-  const filas = [['N°','Fecha','Hora','Artículos','Medio de pago','Total','Anulada']].concat(
-    ventasMes.map(v => [pad(v.id), new Date(v.fecha).toLocaleDateString('es-AR'), hora(v.fecha),
-      (v.items || []).map(l => `${l.nombre} x${l.cant}`).join(' | '), v.medio_pago || '', Math.round(v.total), v.anulada ? 'SI' : '']));
-  const csv = '\ufeff' + filas.map(f => f.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));
-  const d = diaSel(); a.download = `ventas-lilen-${d.getFullYear()}-${pad(d.getMonth()+1,2)}.csv`; a.click();
+// El detalle del mes se baja solo cuando se pide el Excel
+$('#csvBtn').onclick = async () => {
+  const [ini, fin] = rangoMes(), btn = $('#csvBtn');
+  btn.disabled = true; btn.textContent = 'Preparando…';
+  try{
+    const ventas = await DB.listSales(ini, fin);
+    const filas = [['N°','Fecha','Hora','Artículos','Medio de pago','Cobró','Total','Anulada']].concat(
+      ventas.map(v => [pad(v.id), new Date(v.fecha).toLocaleDateString('es-AR'), hora(v.fecha),
+        (v.items || []).map(l => `${l.nombre} x${l.cant}`).join(' | '), v.medio_pago || '', (v.vendedor || '').split('@')[0], Math.round(v.total), v.anulada ? 'SI' : '']));
+    const csv = '﻿' + filas.map(f => f.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));
+    a.download = `ventas-lilen-${ini.getFullYear()}-${pad(ini.getMonth()+1,2)}.csv`; a.click();
+  }catch(err){ alert('No se pudo exportar: ' + (err.message || err)); }
+  finally{ btn.disabled = false; btn.textContent = 'Exportar mes (Excel/CSV)'; }
 };
 
 /* ============ INICIO / LOGIN ============ */
@@ -603,29 +643,40 @@ async function arrancar(){
 
 /* ============ TIEMPO REAL ============
    Cuando otra PC vende o cambia un artículo, esta pantalla se actualiza sola. */
-let refrescoPend = null;
-function refrescar(){
+let refrescoPend = null, enVivo = false;
+function refrescarArticulos(){
   clearTimeout(refrescoPend);
   refrescoPend = setTimeout(async () => {
     const enForm = editando || $('#fNombre').value || $('#fPrecio').value;
     await cargarItems();
     if (!enForm) limpiarForm();
     if ($('#etiquetas').classList.contains('on')) renderEtq();
-    actualizarHoy();
-    if ($('#ventas').classList.contains('on')) cargarVentas();
   }, 400);
+}
+let hoyPend = null;
+function refrescarHoy(){ clearTimeout(hoyPend); hoyPend = setTimeout(actualizarHoy, 1500); }
+// Al volver a la pestaña o si se cortó el tiempo real, ponerse al día
+function refrescar(completo){
+  refrescarArticulos(); actualizarHoy();
+  if ($('#ventas').classList.contains('on')){ if (completo || !enVivo) cargarVentas(); else cargarResumenMes(); }
 }
 function escucharCambios(){
   if (!usaSupabase) return;
   sb.channel('caja')
-    .on('postgres_changes', {event: '*', schema: 'public', table: 'articulos'}, refrescar)
-    .on('postgres_changes', {event: '*', schema: 'public', table: 'ventas'}, refrescar)
+    .on('postgres_changes', {event: '*', schema: 'public', table: 'articulos'}, refrescarArticulos)
+    .on('postgres_changes', {event: '*', schema: 'public', table: 'ventas'}, p => {
+      refrescarHoy();
+      if ($('#ventas').classList.contains('on')) ventaCambio(p.new);
+    })
     .subscribe(estado => {
-      $('#modo').textContent = estado === 'SUBSCRIBED' ? '● En vivo' : 'En la nube';
+      const antes = enVivo; enVivo = estado === 'SUBSCRIBED';
+      $('#modo').textContent = enVivo ? '● En vivo' : 'En la nube';
+      if (enVivo && antes === false && refrescar.listo) refrescar(true); // se reconectó: ponerse al día
+      refrescar.listo = true;
     });
-  // Por si se corta la conexión: al volver a la pestaña y cada 2 minutos
-  window.addEventListener('focus', refrescar);
-  setInterval(refrescar, 120000);
+  window.addEventListener('focus', () => refrescar(false));
+  // Respaldo por si el tiempo real se cae sin avisar: cada 5 minutos, solo si no está en vivo
+  setInterval(() => { if (!enVivo) refrescar(true); }, 300000);
 }
 async function init(){
   if (!usaSupabase){
