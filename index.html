@@ -577,7 +577,12 @@ function rangoMes(){ const d = diaSel(); return [new Date(d.getFullYear(), d.get
 
 async function cargarVentas(){
   const [d, fd] = rangoDia();
-  try{ ventasDia = await DB.listSales(d, fd); }catch(err){ return alert('Error cargando ventas: ' + (err.message || err)); }
+  try{ ventasDia = await DB.listSales(d, fd); }
+  catch(err){
+    const msg = esErrorDeRed(err) ? 'Sin conexión: las ventas se ven cuando vuelva internet.' : 'No se pudieron cargar las ventas: ' + (err.message || err);
+    $('#tVentas').innerHTML = `<tr><td colspan="7" class="muted">${esc(msg)}</td></tr>`;
+    return;
+  }
   renderDia(); cargarResumenMes();
 }
 
