@@ -3,45 +3,80 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lilen · Caja</title>
+<title>Lilén Márquez · Caja</title>
+<meta name="theme-color" content="#c8186a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Jost:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4"></script>
 <style id="pageStyle"></style>
 <style>
+/* Lilén Márquez: blanco del local, rosa peonía de la pared y el logo, dorado de los exhibidores.
+   Encabezado tipo cartel: peonías en las esquinas, nombre en Cinzel al centro. */
 :root{
-  --bg:#f6f4f1; --card:#fff; --ink:#1f1d1a; --muted:#7a746c; --line:#e6e1da;
-  --acc:#8a3d5c; --acc-ink:#fff; --ok:#2e7d4f; --bad:#b3261e;
+  --bg:#fbf6f8; --card:#fff; --ink:#221c1f; --muted:#86787f; --line:#f0e3e9;
+  --acc:#c8186a; --acc-hover:#a31256; --acc-ink:#fff;
+  --rosa:#fdeef4; --rosa-borde:#f4c6d9; --oro:#c7a04c; --oro-suave:#e8d6ab;
+  --ok:#2e7d4f; --bad:#b3261e;
+  --f-marca:'Cinzel', 'Trajan Pro', Georgia, serif;
+  --f-texto:'Jost', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
-header{display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--ink);color:#fff;flex-wrap:wrap}
-header h1{font-size:20px;margin:0;letter-spacing:.5px}
-header h1 span{color:#e9b8cb}
+body{margin:0;font-family:var(--f-texto);background:var(--bg);color:var(--ink)}
+/* Encabezado */
+header{background:var(--card);border-bottom:1px solid var(--oro-suave)}
+.cartel{position:relative;display:flex;justify-content:center;align-items:center;min-height:96px;padding:10px 140px;overflow:hidden}
+.cartel .flor{position:absolute;top:0;height:100%;width:auto;pointer-events:none;user-select:none}
+.cartel .flor.izq{left:0;-webkit-mask-image:linear-gradient(to right,#000 55%,transparent);mask-image:linear-gradient(to right,#000 55%,transparent)}
+.cartel .flor.der{right:0;-webkit-mask-image:linear-gradient(to left,#000 55%,transparent);mask-image:linear-gradient(to left,#000 55%,transparent)}
+.marca{text-align:center;line-height:1}
+.marca .nombre{font-family:var(--f-marca);font-weight:700;font-size:30px;letter-spacing:.06em;color:var(--ink);margin:0}
+.marca .sub{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px;font-family:var(--f-marca);font-size:11px;letter-spacing:.42em;color:var(--ink)}
+.marca .sub::before,.marca .sub::after{content:"";height:1px;width:46px;background:var(--oro)}
+.marca .sub b{color:var(--oro);font-weight:400;letter-spacing:0;font-size:13px}
+.barra-nav{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));border-top:1px solid var(--line);max-width:1200px;margin:0 auto}
 nav{display:flex;gap:6px;flex-wrap:wrap}
-nav button{background:transparent;color:#ddd;border:1px solid #444;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:15px}
-nav button.on{background:#fff;color:var(--ink);border-color:#fff}
-.hdr-right{margin-left:auto;font-size:13px;color:#bbb;display:flex;gap:10px;align-items:center}
-.hdr-right button{background:none;border:1px solid #555;color:#ddd;border-radius:6px;padding:4px 10px;cursor:pointer}
-main{padding:20px;max-width:1200px;margin:0 auto}
+nav button{background:transparent;color:var(--ink);border:1px solid transparent;padding:8px 16px;border-radius:999px;cursor:pointer;font:500 15px var(--f-texto);letter-spacing:.02em}
+nav button:hover{background:var(--rosa)}
+nav button.on{background:var(--acc);color:var(--acc-ink)}
+.hdr-right{margin-left:auto;font-size:13px;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#modo{color:var(--acc);font-weight:600}
+.hdr-right button{background:none;border:1px solid var(--rosa-borde);color:var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer;font:inherit}
+.hdr-right button:hover{background:var(--rosa)}
+@media(max-width:640px){
+  .cartel{min-height:70px;padding:8px 76px}
+  .marca .nombre{font-size:20px}
+  .marca .sub{font-size:9px;letter-spacing:.3em;gap:6px}
+  .marca .sub::before,.marca .sub::after{width:18px}
+  nav button{padding:7px 12px;font-size:14px}
+}
+main{padding-block:20px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1232px;margin:0 auto}
 .tab{display:none}.tab.on{display:block}
-.card{overflow-x:auto;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
-h2{font-size:17px;margin:0 0 12px}
-input,select{font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
-button.btn{font-size:15px;padding:10px 16px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer}
-button.pri{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.card{overflow-x:auto;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+h2{font-family:var(--f-marca);font-weight:600;font-size:15px;letter-spacing:.06em;margin:0 0 12px}
+h2 .muted{font-family:var(--f-texto);letter-spacing:0}
+input,select{font:16px var(--f-texto);padding:10px 12px;border:1px solid var(--rosa-borde);border-radius:10px;background:#fff;color:var(--ink)}
+input:focus,select:focus{outline:2px solid var(--acc);outline-offset:1px;border-color:var(--acc)}
+button{font-family:var(--f-texto)}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button.btn{font-size:15px;padding:10px 16px;border-radius:10px;border:1px solid var(--rosa-borde);background:#fff;color:var(--ink);cursor:pointer}
+button.btn:hover{background:var(--rosa)}
+button.pri{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600;letter-spacing:.03em}
+button.pri:hover{background:var(--acc-hover);border-color:var(--acc-hover)}
 button.big{font-size:20px;padding:16px 22px;width:100%}
-button.danger{color:var(--bad)}
+button.danger{color:var(--bad);border-color:#f1c9c6}
 button:disabled{opacity:.5;cursor:default}
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);font-size:15px}
-th{font-size:13px;color:var(--muted);font-weight:600}
+th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
 td.num,th.num{text-align:right}
 .muted{color:var(--muted)}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .aviso{display:none;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:15px;font-weight:600}
 .aviso.off{display:block;background:#fde8e6;border:1px solid #f1a9a2;color:#8c1d14}
 .aviso.sub{display:block;background:#e7f1fb;border:1px solid #a9c8ea;color:#1d4f8c}
-.banner{padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:14px;background:#fff4d6;border:1px solid #f0d58a}
+.banner{padding:10px 14px;border-radius:10px;margin-bottom:16px;font-size:14px;background:#fbf4e3;border:1px solid var(--oro-suave)}
 /* Caja */
 .caja{display:grid;grid-template-columns:1fr 360px;gap:16px}
 @media(max-width:860px){.caja{grid-template-columns:1fr}}
@@ -49,35 +84,36 @@ td.num,th.num{text-align:right}
 #scanMsg{min-height:22px;margin-top:6px;font-size:14px}
 .err{color:var(--bad)}.okc{color:var(--ok)}
 .quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
-.quick button{padding:12px 8px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;text-align:left}
+.quick button{padding:12px 10px;border-radius:12px;border:1px solid var(--rosa-borde);background:#fff;cursor:pointer;text-align:left;color:var(--ink)}
+.quick button:hover{background:var(--rosa);border-color:var(--acc)}
 .quick b{display:block;font-size:14px}.quick small{color:var(--muted)}
 .desc{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px;align-items:center}
-.desc button{padding:7px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:14px;font-variant-numeric:tabular-nums}
+.desc button{padding:7px 12px;border-radius:999px;border:1px solid var(--rosa-borde);background:#fff;color:var(--ink);cursor:pointer;font-size:14px;font-variant-numeric:tabular-nums}
 .desc button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
 .desc input{width:84px;padding:7px 8px;font-size:14px}
 .subt{display:flex;justify-content:space-between;font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
 .subt.ahorro{color:var(--ok)}
-.vuelto{margin:-4px 0 12px;padding:10px 12px;border-radius:8px;background:#f3f6f3;font-size:15px}
+.vuelto{margin:-4px 0 12px;padding:10px 12px;border-radius:12px;background:var(--rosa);border:1px solid var(--rosa-borde);font-size:15px}
 .vuelto .row{flex-wrap:nowrap}
 .vuelto input{width:100%;font-size:18px;padding:8px 10px}
 .vuelto .res{font-size:22px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
 .vuelto .res.falta{color:var(--bad)}
 .total{font-size:44px;font-weight:700;text-align:right;margin:4px 0 12px;font-variant-numeric:tabular-nums}
 .qty{display:inline-flex;align-items:center;gap:6px}
-.qty button{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer}
+.qty button{width:28px;height:28px;border-radius:999px;border:1px solid var(--rosa-borde);background:#fff;color:var(--ink);cursor:pointer}
 /* Ventas */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
 .stat .v{font-size:28px;font-weight:700}.stat .l{font-size:13px;color:var(--muted)}
 .graf{width:100%;overflow:hidden}
 .graf svg{display:block;width:100%;height:auto}
 .graf .barra{fill:var(--acc)}
-.graf .col:hover .barra,.graf .col:focus .barra{fill:#5e2740}
+.graf .col:hover .barra,.graf .col:focus .barra{fill:var(--acc-hover)}
 .graf .col{outline:none}
 .graf .eje{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
 .graf .val{fill:var(--ink);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}
 .graf .grid{stroke:var(--line);stroke-width:1}
-.graf .base{stroke:#cfc8bf;stroke-width:1}
+.graf .base{stroke:var(--oro-suave);stroke-width:1}
 .grafs{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:860px){.grafs{grid-template-columns:1fr}}
 .grafs .card{min-width:0}
@@ -95,8 +131,9 @@ td.num,th.num{text-align:right}
 .labels.rollo .lbl{margin:0}
 @media print{.labels.rollo .lbl{height:23.5mm;break-after:page;page-break-after:always}.labels.rollo .lbl:last-child{break-after:auto;page-break-after:auto}}
 /* Login */
-#login{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:10}
-#login .card{width:320px}
+#login{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:10}
+#login .card{width:340px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 10px 40px rgba(200,24,106,.12)}
+.login-logo{display:block;width:150px;max-width:100%;margin:0 auto 10px;border-radius:8px}
 #login input{width:100%;margin-bottom:10px}
 /* Impresión */
 #printArea{display:none}
@@ -134,7 +171,15 @@ const CONFIG = {
 </script>
 
 <header>
-  <h1>Lilen <span>· Caja</span></h1>
+  <div class="cartel">
+    <img class="flor izq" src="assets/peonia-izq.jpg" alt="">
+    <div class="marca">
+      <h1 class="nombre">LILÉN MÁRQUEZ</h1>
+      <div class="sub">INDUMENTARIA <b>♡</b> CAJA</div>
+    </div>
+    <img class="flor der" src="assets/peonia-der.jpg" alt="">
+  </div>
+  <div class="barra-nav">
   <nav>
     <button data-t="caja" class="on">Caja</button>
     <button data-t="ventas" class="soloAdmin" hidden>Ventas</button>
@@ -142,6 +187,7 @@ const CONFIG = {
     <button data-t="etiquetas">Etiquetas</button>
   </nav>
   <div class="hdr-right"><span id="usuario"></span><span id="modo"></span><button id="logout" style="display:none">Salir</button></div>
+  </div>
 </header>
 
 <main>
@@ -272,8 +318,9 @@ const CONFIG = {
 </main>
 
 <div id="login">
-  <div class="card">
-    <h2>Ingresar a la caja</h2>
+  <div class="card login-card">
+    <img src="assets/logo.jpg" alt="Lilén Márquez Indumentaria" class="login-logo">
+    <h2 style="text-align:center">Ingresar a la caja</h2>
     <form id="lForm" autocomplete="on">
       <input id="lEmail" name="email" type="email" placeholder="Email" autocomplete="username">
       <input id="lPass" name="password" type="password" placeholder="Contraseña" autocomplete="current-password">
