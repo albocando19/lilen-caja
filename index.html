@@ -24,7 +24,7 @@ nav button.on{background:#fff;color:var(--ink);border-color:#fff}
 .hdr-right button{background:none;border:1px solid #555;color:#ddd;border-radius:6px;padding:4px 10px;cursor:pointer}
 main{padding:20px;max-width:1200px;margin:0 auto}
 .tab{display:none}.tab.on{display:block}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.card{overflow-x:auto;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
 h2{font-size:17px;margin:0 0 12px}
 input,select{font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
 button.btn{font-size:15px;padding:10px 16px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer}
@@ -51,13 +51,38 @@ td.num,th.num{text-align:right}
 .quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
 .quick button{padding:12px 8px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;text-align:left}
 .quick b{display:block;font-size:14px}.quick small{color:var(--muted)}
-.total{font-size:44px;font-weight:700;text-align:right;margin:8px 0 16px}
+.desc{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px;align-items:center}
+.desc button{padding:7px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:14px;font-variant-numeric:tabular-nums}
+.desc button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.desc input{width:84px;padding:7px 8px;font-size:14px}
+.subt{display:flex;justify-content:space-between;font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
+.subt.ahorro{color:var(--ok)}
+.vuelto{margin:-4px 0 12px;padding:10px 12px;border-radius:8px;background:#f3f6f3;font-size:15px}
+.vuelto .row{flex-wrap:nowrap}
+.vuelto input{width:100%;font-size:18px;padding:8px 10px}
+.vuelto .res{font-size:22px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
+.vuelto .res.falta{color:var(--bad)}
+.total{font-size:44px;font-weight:700;text-align:right;margin:4px 0 12px;font-variant-numeric:tabular-nums}
 .qty{display:inline-flex;align-items:center;gap:6px}
 .qty button{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer}
 /* Ventas */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
 .stat .v{font-size:28px;font-weight:700}.stat .l{font-size:13px;color:var(--muted)}
+.graf{width:100%;overflow:hidden}
+.graf svg{display:block;width:100%;height:auto}
+.graf .barra{fill:var(--acc)}
+.graf .col:hover .barra,.graf .col:focus .barra{fill:#5e2740}
+.graf .col{outline:none}
+.graf .eje{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.graf .val{fill:var(--ink);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}
+.graf .grid{stroke:var(--line);stroke-width:1}
+.graf .base{stroke:#cfc8bf;stroke-width:1}
+.grafs{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:860px){.grafs{grid-template-columns:1fr}}
+.grafs .card{min-width:0}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:#fff;font-size:13px;padding:6px 9px;border-radius:6px;z-index:20;white-space:nowrap;font-variant-numeric:tabular-nums}
+.delta{font-weight:600}.delta.up{color:var(--ok)}.delta.down{color:var(--bad)}
 .anulada td{text-decoration:line-through;color:var(--muted)}
 /* Etiquetas */
 .labels{display:flex;flex-wrap:wrap;gap:4mm}
@@ -104,6 +129,7 @@ const CONFIG = {
   SUPABASE_URL: 'https://jqqtjygmdoadofarnbco.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_5fSvvUgb3kU5zIxmQFWJHg_CKP508Do',
   MEDIOS_PAGO: ['Efectivo','Débito','Crédito','Transferencia','QR / Mercado Pago'],
+  DESCUENTOS_RAPIDOS: [0, 5, 10, 15, 20],   // botones de descuento (opcional, arranca en "Sin desc.")
 };
 </script>
 
@@ -147,10 +173,19 @@ const CONFIG = {
       </div>
       <div>
         <div class="card">
-          <div class="muted">Total</div>
-          <div class="total" id="total">$ 0</div>
-          <label class="muted" style="font-size:13px">Medio de pago</label>
+          <label class="muted" style="font-size:13px" for="medio">Medio de pago</label>
           <select id="medio" style="width:100%;margin:4px 0 12px"></select>
+          <div class="muted" style="font-size:13px">Descuento</div>
+          <div class="desc" id="descBtns"></div>
+          <div class="subt" id="subtRow" hidden><span>Subtotal</span><span id="subtotal">$ 0</span></div>
+          <div class="subt ahorro" id="descRow" hidden><span id="descLbl">Descuento</span><span id="descMonto">−$ 0</span></div>
+          <div class="muted" style="margin-top:6px">Total</div>
+          <div class="total" id="total">$ 0</div>
+          <div class="vuelto" id="vueltoBox" hidden>
+            <label for="pagaCon" class="muted" style="font-size:13px">Paga con (opcional)</label>
+            <input id="pagaCon" type="text" inputmode="numeric" placeholder="$ 0" autocomplete="off">
+            <div class="res" id="vueltoRes" hidden></div>
+          </div>
           <label class="row" style="margin-bottom:12px;font-size:15px"><input type="checkbox" id="imprimirChk" checked style="width:18px;height:18px"> Imprimir recibo</label>
           <button class="btn pri big" id="cobrar" disabled>Cobrar (F2)</button>
           <button class="btn" id="vaciar" style="width:100%;margin-top:8px">Vaciar venta</button>
@@ -175,6 +210,14 @@ const CONFIG = {
       <div class="stat"><div class="l" id="lblDia">Día</div><div class="v" id="sDia">$ 0</div><div class="l" id="sDiaN"></div></div>
       <div class="stat"><div class="l" id="lblMes">Mes</div><div class="v" id="sMes">$ 0</div><div class="l" id="sMesN"></div></div>
       <div class="stat"><div class="l">Ticket promedio del mes</div><div class="v" id="sProm">$ 0</div></div>
+    </div>
+    <div class="card">
+      <h2>Ventas por día <span class="muted" id="gDiaSub" style="font-weight:400;font-size:13px"></span></h2>
+      <div class="graf" id="gDia"></div>
+    </div>
+    <div class="grafs">
+      <div class="card"><h2>Por hora del día <span class="muted" style="font-weight:400;font-size:13px">· total del mes</span></h2><div class="graf" id="gHora"></div></div>
+      <div class="card"><h2>Por día de la semana <span class="muted" style="font-weight:400;font-size:13px">· total del mes</span></h2><div class="graf" id="gDow"></div></div>
     </div>
     <div class="card">
       <h2>Ventas del día</h2>
@@ -287,9 +330,17 @@ const Local = {
     });
     return {
       total: ok.reduce((s,v) => s + Number(v.total), 0), cantidad: ok.length,
+      descuentos: ok.reduce((s,v) => s + Number(v.descuento || 0), 0),
       por_item: Object.entries(it).map(([nombre,x]) => ({nombre, ...x})).sort((a,b) => b.t - a.t),
       por_medio: Object.entries(me).map(([medio,x]) => ({medio, ...x})).sort((a,b) => b.t - a.t),
     };
+  },
+  async graficos(desde, hasta){
+    const ok = (await this.listSales(desde, hasta)).filter(v => !v.anulada), g = {dia:{}, hora:{}, dow:{}};
+    ok.forEach(v => { const f = new Date(v.fecha), add = (o,k) => { o[k] ??= {k, t:0, n:0}; o[k].t += Number(v.total); o[k].n++; };
+      add(g.dia, f.getDate()); add(g.hora, f.getHours()); add(g.dow, ((f.getDay() + 6) % 7) + 1); });
+    const arr = o => Object.values(o).sort((a,b) => a.k - b.k);
+    return {por_dia: arr(g.dia), por_hora: arr(g.hora), por_dow: arr(g.dow)};
   }
 };
 
@@ -310,6 +361,7 @@ const Remote = {
     const {data, error} = await sb.rpc('registrar_venta', {
       p_total: s.total, p_medio: s.medio_pago, p_items: s.items,
       p_cliente_id: s.cliente_id || null, p_fecha: s.fecha || null,
+      p_subtotal: s.subtotal ?? null, p_descuento_pct: s.descuento_pct || 0,
     }).abortSignal(AbortSignal.timeout(8000));
     if (error) throw error; return data;
   },
@@ -334,7 +386,11 @@ const Remote = {
   async resumen(desde, hasta){
     const {data, error} = await sb.rpc('resumen_ventas', {p_desde: desde.toISOString(), p_hasta: hasta.toISOString()});
     if (error) throw error;
-    return {...data, total: Number(data.total), cantidad: Number(data.cantidad)};
+    return {...data, total: Number(data.total), cantidad: Number(data.cantidad), descuentos: Number(data.descuentos || 0)};
+  },
+  async graficos(desde, hasta){
+    const {data, error} = await sb.rpc('graficos_ventas', {p_desde: desde.toISOString(), p_hasta: hasta.toISOString()});
+    if (error) throw error; return data;
   }
 };
 const DB = usaSupabase ? Remote : Local;
@@ -377,7 +433,32 @@ $('#scan').addEventListener('keydown', e => {
   if (e.key === 'Enter'){ const v = e.target.value.trim(); e.target.value = ''; if (v) agregar(v); }
 });
 
-function totalCart(){ return cart.reduce((s,l) => s + l.precio * l.cant, 0); }
+let descPct = 0;
+function subtotalCart(){ return cart.reduce((s,l) => s + l.precio * l.cant, 0); }
+function descuentoCart(){ return Math.round(subtotalCart() * descPct / 100); }
+function totalCart(){ return subtotalCart() - descuentoCart(); }
+function numPesos(txt){ return Math.round(Number(String(txt).replace(/[^\d,]/g, '').replace(',', '.')) || 0); }
+
+function renderDesc(){
+  const rapidos = CONFIG.DESCUENTOS_RAPIDOS, otro = !rapidos.includes(descPct);
+  $('#descBtns').innerHTML = rapidos.map(p => `<button type="button" data-p="${p}" class="${p === descPct ? 'on' : ''}">${p ? p + '%' : 'Sin desc.'}</button>`).join('')
+    + `<input id="descOtro" type="number" min="0" max="100" step="1" placeholder="otro %" value="${otro ? descPct : ''}" class="${otro ? 'on' : ''}" aria-label="Otro descuento en %">`;
+}
+function setDesc(p){ descPct = Math.max(0, Math.min(100, Number(p) || 0)); renderDesc(); renderCart(); }
+$('#descBtns').addEventListener('click', e => { const b = e.target.closest('button'); if (b){ setDesc(b.dataset.p); $('#scan').focus(); } });
+$('#descBtns').addEventListener('change', e => { if (e.target.id === 'descOtro') setDesc(e.target.value); });
+
+function renderVuelto(){
+  const efectivo = $('#medio').value === 'Efectivo';
+  $('#vueltoBox').hidden = !efectivo || !cart.length;
+  const paga = numPesos($('#pagaCon').value), tot = totalCart(), res = $('#vueltoRes');
+  if (!efectivo || !paga){ res.hidden = true; return; }
+  res.hidden = false;
+  if (paga >= tot){ res.className = 'res'; res.textContent = 'Vuelto: ' + fmt(paga - tot); }
+  else { res.className = 'res falta'; res.textContent = 'Faltan ' + fmt(tot - paga); }
+}
+$('#pagaCon').addEventListener('input', renderVuelto);
+$('#pagaCon').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); cobrar(); } });
 
 function renderCart(){
   $('#cart').innerHTML = cart.map((l,i) => `<tr>
@@ -387,8 +468,13 @@ function renderCart(){
     <td class="num">${fmt(l.precio * l.cant)}</td>
     <td><button class="btn danger" data-del="${i}" style="padding:4px 10px">✕</button></td></tr>`).join('');
   $('#cartEmpty').style.display = cart.length ? 'none' : 'block';
+  const sub = subtotalCart(), d = descuentoCart();
+  $('#subtRow').hidden = $('#descRow').hidden = !(d > 0);
+  $('#subtotal').textContent = fmt(sub);
+  $('#descLbl').textContent = `Descuento ${descPct}%`; $('#descMonto').textContent = '−' + fmt(d);
   $('#total').textContent = fmt(totalCart());
   $('#cobrar').disabled = !cart.length;
+  renderVuelto();
 }
 
 $('#cart').addEventListener('click', e => {
@@ -405,6 +491,8 @@ function renderQuick(){
 $('#quick').addEventListener('click', e => { const b = e.target.closest('button'); if (b){ agregar(b.dataset.c); $('#scan').focus(); } });
 
 $('#medio').innerHTML = CONFIG.MEDIOS_PAGO.map(m => `<option>${esc(m)}</option>`).join('');
+$('#medio').addEventListener('change', renderVuelto);
+renderDesc();
 
 $('#vaciar').onclick = () => { if (cart.length && confirm('¿Vaciar la venta actual?')){ cart = []; renderCart(); } $('#scan').focus(); };
 
@@ -412,8 +500,11 @@ let cobrando = false;
 async function cobrar(){
   if (!cart.length || cobrando) return;
   cobrando = true; $('#cobrar').disabled = true;
+  const paga = $('#medio').value === 'Efectivo' ? numPesos($('#pagaCon').value) : 0;
+  if (paga && paga < totalCart()){ alert(`El pago (${fmt(paga)}) es menor que el total (${fmt(totalCart())}). Corregí el "Paga con" o borralo.`); cobrando = false; $('#cobrar').disabled = false; $('#pagaCon').focus(); return; }
   const nueva = {
-    total: totalCart(), medio_pago: $('#medio').value, items: cart.map(l => ({...l})),
+    total: totalCart(), subtotal: subtotalCart(), descuento_pct: descPct, descuento: descuentoCart(),
+    medio_pago: $('#medio').value, items: cart.map(l => ({...l})),
     cliente_id: nuevoId(), fecha: new Date().toISOString(),
   };
   try{
@@ -424,11 +515,11 @@ async function cobrar(){
       try{ venta = await DB.addSale(nueva); }
       catch(err){ if (usaSupabase && esErrorDeRed(err)) venta = Cola.agregar(nueva); else throw err; }
     }
-    if ($('#imprimirChk').checked) imprimirTicket(venta);
+    if ($('#imprimirChk').checked) imprimirTicket({...venta, paga_con: paga || null});
     $('#scanMsg').innerHTML = venta.provisorio
       ? `<span class="err">Sin conexión: venta ${venta.provisorio} guardada en esta PC · ${fmt(venta.total)}. Se sube sola cuando vuelva internet.</span>`
       : `<span class="okc">Venta N° ${venta.id} guardada · ${fmt(venta.total)}</span>`;
-    cart = []; renderCart(); actualizarHoy(); mostrarAviso();
+    cart = []; $('#pagaCon').value = ''; descPct = 0; renderDesc(); renderCart(); actualizarHoy(); mostrarAviso();
     if (venta.provisorio) sincronizar();
   }catch(err){
     alert('No se pudo guardar la venta: ' + (err.message || err)); 
@@ -474,8 +565,11 @@ function imprimirTicket(v){
     <div class="c">${esc(CONFIG.SUBTITULO)}</div><hr>
     <div>Recibo N° ${v.provisorio ? v.provisorio + ' (provisorio)' : pad(v.id)}</div><div>${fechaHora(v.fecha)}</div><hr>
     ${items.map(l => `<div>${esc(l.nombre)}</div><div class="l"><span>&nbsp;${l.cant} x ${fmt(l.precio)}</span><span>${fmt(l.precio * l.cant)}</span></div>`).join('')}
-    <hr><div class="l tot"><span>TOTAL</span><span>${fmt(v.total)}</span></div>
+    <hr>${Number(v.descuento) > 0 ? `<div class="l"><span>Subtotal</span><span>${fmt(v.subtotal)}</span></div>
+    <div class="l"><span>Descuento ${Number(v.descuento_pct)}%</span><span>-${fmt(v.descuento)}</span></div>` : ''}
+    <div class="l tot"><span>TOTAL</span><span>${fmt(v.total)}</span></div>
     <div>Pago: ${esc(v.medio_pago || '')}</div>
+    ${v.paga_con ? `<div class="l"><span>Paga con</span><span>${fmt(v.paga_con)}</span></div><div class="l"><span>Vuelto</span><span>${fmt(v.paga_con - v.total)}</span></div>` : ''}
     ${v.anulada ? '<div class="c tot">*** ANULADA ***</div>' : ''}
     <hr><div class="c">${esc(CONFIG.PIE_RECIBO).replace(/\n/g,'<br>')}</div>
   </div>`, 'ticket');
@@ -593,7 +687,7 @@ function renderDia(){
   $('#tVentas').innerHTML = ventasDia.slice().sort((a,b) => b.id - a.id).map(v => `<tr class="${v.anulada ? 'anulada' : ''}">
     <td>${pad(v.id)}</td><td>${hora(v.fecha)}</td>
     <td>${(v.items || []).map(l => `${esc(l.nombre)}${l.cant > 1 ? ' x' + l.cant : ''}`).join(', ')}</td>
-    <td>${esc(v.medio_pago || '')}</td><td class="muted">${esc((v.vendedor || '').split('@')[0])}</td><td class="num">${fmt(v.total)}</td>
+    <td>${esc(v.medio_pago || '')}</td><td class="muted">${esc((v.vendedor || '').split('@')[0])}</td><td class="num">${fmt(v.total)}${Number(v.descuento_pct) > 0 ? `<br><span class="muted" style="font-size:12px">−${Number(v.descuento_pct)}%</span>` : ''}</td>
     <td class="num"><button class="btn" data-re="${v.id}" style="padding:4px 10px">Reimprimir</button>
     ${v.anulada ? '' : `<button class="btn danger" data-an="${v.id}" style="padding:4px 10px">Anular</button>`}</td></tr>`).join('')
     || '<tr><td colspan="7" class="muted">Sin ventas ese día.</td></tr>';
@@ -603,13 +697,125 @@ async function cargarResumenMes(){
   const [ini, fin] = rangoMes();
   let r; try{ r = await DB.resumen(ini, fin); }catch(err){ return; }
   $('#lblMes').textContent = 'Total de ' + ini.toLocaleDateString('es-AR', {month:'long', year:'numeric'});
-  $('#sMes').textContent = fmt(r.total); $('#sMesN').textContent = `${r.cantidad} ventas`;
+  $('#sMes').textContent = fmt(r.total);
+  $('#sMesN').textContent = `${r.cantidad} ventas` + (r.descuentos > 0 ? ` · ${fmt(r.descuentos)} en descuentos` : '');
+  compararMesAnterior(ini, r.total);
+  cargarGraficos(ini, fin);
   $('#sProm').textContent = fmt(r.cantidad ? r.total / r.cantidad : 0);
   $('#tPorItem').innerHTML = (r.por_item || []).map(x => `<tr><td>${esc(x.nombre)}</td><td class="num">${Number(x.u)}</td><td class="num">${fmt(x.t)}</td></tr>`).join('')
     || '<tr><td colspan="3" class="muted">—</td></tr>';
   $('#tPorMedio').innerHTML = (r.por_medio || []).map(x => `<tr><td>${esc(x.medio)}</td><td class="num">${Number(x.n)}</td><td class="num">${fmt(x.t)}</td></tr>`).join('')
     || '<tr><td colspan="3" class="muted">—</td></tr>';
 }
+
+/* ---------- Comparación con el mes anterior (mismo tramo de días si el mes está en curso) ---------- */
+async function compararMesAnterior(ini, totalActual){
+  const hoy = new Date(), enCurso = ini.getFullYear() === hoy.getFullYear() && ini.getMonth() === hoy.getMonth();
+  const pIni = new Date(ini.getFullYear(), ini.getMonth() - 1, 1);
+  let pFin = new Date(ini.getFullYear(), ini.getMonth(), 1);
+  if (enCurso){
+    const corte = new Date(pIni.getFullYear(), pIni.getMonth(), hoy.getDate(), hoy.getHours(), hoy.getMinutes());
+    if (corte < pFin) pFin = corte;
+  }
+  let prev; try{ prev = await DB.resumen(pIni, pFin); }catch{ return; }
+  const nombre = pIni.toLocaleDateString('es-AR', {month:'long'});
+  const el = document.createElement('div'); el.className = 'l'; el.id = 'sMesVs';
+  if (!prev.total){ el.textContent = `Sin ventas en ${nombre} para comparar`; }
+  else {
+    const d = Math.round((totalActual - prev.total) / prev.total * 100);
+    el.innerHTML = `<span class="delta ${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '▲' : '▼'} ${Math.abs(d)}%</span> vs ${esc(nombre)}${enCurso ? ' (mismos días)' : ''}`;
+  }
+  $('#sMesVs')?.remove(); $('#sMesN').after(el);
+}
+
+/* ---------- Gráficos de barras (SVG simple, un solo color) ---------- */
+const DOW = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+let graficosData = null;
+function fmtCorto(n){
+  n = Math.round(n);
+  if (n >= 1e6) return '$ ' + (n / 1e6).toLocaleString('es-AR', {maximumFractionDigits: 1}) + ' M';
+  if (n >= 1e3) return '$ ' + Math.round(n / 1e3).toLocaleString('es-AR') + ' mil';
+  return fmt(n);
+}
+function escalaLinda(max){
+  if (max <= 0) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(max))), m = max / p;
+  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+}
+function barras(cont, datos, cada = 1){
+  const W = Math.max(280, cont.clientWidth || 600), H = 190, iz = 58, de = 8, ar = 16, ab = 24;
+  const ancho = W - iz - de, alto = H - ar - ab, n = datos.length;
+  const max = escalaLinda(Math.max(0, ...datos.map(d => d.t)));
+  const paso = ancho / n, bw = Math.max(2, Math.min(36, paso - Math.max(2, paso * 0.25)));
+  const y = v => ar + alto - (v / max) * alto;
+  const ticks = [0, max / 2, max];
+  const iMax = datos.reduce((im, d, i) => d.t > (datos[im]?.t ?? -1) ? i : im, 0);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de barras">`;
+  ticks.forEach(t => {
+    svg += `<line class="${t ? 'grid' : 'base'}" x1="${iz}" x2="${W - de}" y1="${y(t)}" y2="${y(t)}"/>`
+         + `<text class="eje" x="${iz - 6}" y="${y(t) + 4}" text-anchor="end">${t ? fmtCorto(t) : '0'}</text>`;
+  });
+  datos.forEach((d, i) => {
+    const cx = iz + paso * i + paso / 2, h = Math.max(0, alto - (y(d.t) - ar)), x = cx - bw / 2, top = y(d.t);
+    const rad = Math.min(4, bw / 2, h);
+    // barra con puntas redondeadas arriba y apoyada en la base
+    const path = h > 0 ? `M${x},${ar + alto} V${top + rad} Q${x},${top} ${x + rad},${top} H${x + bw - rad} Q${x + bw},${top} ${x + bw},${top + rad} V${ar + alto} Z` : '';
+    svg += `<g class="col" tabindex="0" data-i="${i}">
+      <rect x="${iz + paso * i}" y="${ar}" width="${paso}" height="${alto}" fill="transparent"/>
+      ${path ? `<path class="barra" d="${path}"/>` : ''}</g>`;
+    if (i % cada === 0 || i === n - 1) svg += `<text class="eje" x="${cx}" y="${H - 6}" text-anchor="middle">${esc(d.label)}</text>`;
+  });
+  if (datos[iMax] && datos[iMax].t > 0){
+    const cx = iz + paso * iMax + paso / 2;
+    svg += `<text class="val" x="${Math.min(W - de - 30, Math.max(iz + 30, cx))}" y="${y(datos[iMax].t) - 5}" text-anchor="middle">${fmtCorto(datos[iMax].t)}</text>`;
+  }
+  cont.innerHTML = svg + '</svg>';
+  cont._datos = datos;
+}
+// Tooltip al pasar el mouse o con el teclado
+(function(){
+  const tip = document.createElement('div'); tip.className = 'tip'; tip.hidden = true; document.body.appendChild(tip);
+  const mostrar = (g, ev) => {
+    const cont = g.closest('.graf'), d = cont._datos[+g.dataset.i];
+    tip.textContent = `${d.tip}: ${fmt(d.t)} · ${d.n} venta${d.n === 1 ? '' : 's'}`; tip.hidden = false;
+    const r = g.getBoundingClientRect(), x = ev && ev.clientX ? ev.clientX : r.left + r.width / 2;
+    tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, Math.max(8, x - tip.offsetWidth / 2)) + 'px';
+    tip.style.top = Math.max(8, r.top - tip.offsetHeight - 6) + 'px';
+  };
+  document.addEventListener('mouseover', e => { const g = e.target.closest?.('.graf .col'); if (g) mostrar(g, e); else tip.hidden = true; });
+  document.addEventListener('mousemove', e => { const g = e.target.closest?.('.graf .col'); if (g) mostrar(g, e); });
+  document.addEventListener('focusin', e => { const g = e.target.closest?.('.graf .col'); if (g) mostrar(g); else tip.hidden = true; });
+  document.addEventListener('scroll', () => tip.hidden = true, true);
+})();
+
+async function cargarGraficos(ini, fin){
+  try{ graficosData = {g: await DB.graficos(ini, fin), ini, fin}; }catch{ return; }
+  dibujarGraficos();
+}
+function dibujarGraficos(){
+  if (!graficosData || !$('#ventas').classList.contains('on')) return;
+  const {g, ini} = graficosData, num = d => ({...d, t: Number(d.t), n: Number(d.n)});
+  const diasMes = new Date(ini.getFullYear(), ini.getMonth() + 1, 0).getDate();
+  const porDia = new Map((g.por_dia || []).map(d => [Number(d.k), num(d)]));
+  const mesTxt = ini.toLocaleDateString('es-AR', {month:'short'});
+  barras($('#gDia'), Array.from({length: diasMes}, (_, i) => {
+    const d = porDia.get(i + 1) || {t:0, n:0};
+    const f = new Date(ini.getFullYear(), ini.getMonth(), i + 1);
+    return {...d, label: String(i + 1), tip: f.toLocaleDateString('es-AR', {weekday:'short', day:'numeric', month:'short'})};
+  }), innerWidth < 600 ? 5 : 2);
+  $('#gDiaSub').textContent = '· ' + ini.toLocaleDateString('es-AR', {month:'long', year:'numeric'});
+
+  const horas = (g.por_hora || []).map(num), porHora = new Map(horas.map(d => [Number(d.k), d]));
+  const hMin = Math.min(9, ...horas.map(d => Number(d.k))), hMax = Math.max(20, ...horas.map(d => Number(d.k)));
+  barras($('#gHora'), Array.from({length: hMax - hMin + 1}, (_, i) => {
+    const h = hMin + i, d = porHora.get(h) || {t:0, n:0};
+    return {...d, label: String(h), tip: `${h}:00 a ${h + 1}:00`};
+  }), innerWidth < 600 ? 3 : 1);
+
+  const porDow = new Map((g.por_dow || []).map(d => [Number(d.k), num(d)]));
+  barras($('#gDow'), DOW.map((n, i) => ({...(porDow.get(i + 1) || {t:0, n:0}), label: n, tip: n + ' (' + mesTxt + ')'})));
+}
+let resizeT; addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(dibujarGraficos, 150); });
 
 // Llega una venta nueva o anulada por tiempo real: se suma a la lista sin volver a bajar todo
 function ventaCambio(fila){
@@ -638,9 +844,10 @@ $('#csvBtn').onclick = async () => {
   btn.disabled = true; btn.textContent = 'Preparando…';
   try{
     const ventas = await DB.listSales(ini, fin);
-    const filas = [['N°','Fecha','Hora','Artículos','Medio de pago','Cobró','Total','Anulada']].concat(
+    const filas = [['N°','Fecha','Hora','Artículos','Medio de pago','Cobró','Subtotal','Descuento %','Descuento $','Total','Anulada']].concat(
       ventas.map(v => [pad(v.id), new Date(v.fecha).toLocaleDateString('es-AR'), hora(v.fecha),
-        (v.items || []).map(l => `${l.nombre} x${l.cant}`).join(' | '), v.medio_pago || '', (v.vendedor || '').split('@')[0], Math.round(v.total), v.anulada ? 'SI' : '']));
+        (v.items || []).map(l => `${l.nombre} x${l.cant}`).join(' | '), v.medio_pago || '', (v.vendedor || '').split('@')[0],
+        Math.round(v.subtotal ?? v.total), Number(v.descuento_pct || 0), Math.round(v.descuento || 0), Math.round(v.total), v.anulada ? 'SI' : '']));
     const csv = '﻿' + filas.map(f => f.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));

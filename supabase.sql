@@ -109,3 +109,10 @@ begin
   return to_jsonb(v);
 end;
 $$;
+
+-- ===== Descuentos y gráficos =====
+alter table public.ventas add column if not exists subtotal numeric(12,2);
+alter table public.ventas add column if not exists descuento_pct numeric(5,2) not null default 0;
+alter table public.ventas add column if not exists descuento numeric(12,2) not null default 0;
+-- registrar_venta ahora recibe también p_subtotal y p_descuento_pct (ver migración "descuentos_y_graficos" en Supabase)
+-- resumen_ventas devuelve además 'descuentos'; graficos_ventas devuelve por_dia, por_hora y por_dow (hora de Argentina)
