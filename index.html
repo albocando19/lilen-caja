@@ -28,6 +28,12 @@ body{margin:0;font-family:var(--f-texto);background:var(--bg);color:var(--ink)}
 /* Modo compacto: para el mostrador, donde la repisa tapa arriba y la pantalla es chica */
 .compacto-chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--ink);font-weight:500;padding:4px 10px;border:1px solid var(--rosa-borde);border-radius:999px;background:#fff}
 .compacto-chk input{width:16px;height:16px;padding:0;accent-color:var(--acc)}
+.ajuste{display:none;gap:4px}
+.compacto .ajuste{display:inline-flex}
+.ajuste button{width:30px;height:28px;padding:0;border-radius:8px!important;font-size:12px}
+/* Espacio vacío arriba (lo que tapa la repisa); todo lo demás baja */
+body.compacto{padding-top:var(--arriba,120px)}
+.compacto header{border-top:1px solid var(--oro-suave)}
 .compacto .cartel{min-height:40px;padding:4px 70px}
 .compacto .marca .nombre{font-size:15px}
 .compacto .marca .sub{display:none}
@@ -223,7 +229,7 @@ const CONFIG = {
     <button data-t="articulos">Artículos</button>
     <button data-t="etiquetas">Etiquetas</button>
   </nav>
-  <div class="hdr-right"><label class="compacto-chk" title="Achica la pantalla para que entre todo en el mostrador"><input type="checkbox" id="compactoChk"> Modo compacto</label><span id="usuario"></span><span id="modo"></span><button id="logout" style="display:none">Salir</button></div>
+  <div class="hdr-right"><label class="compacto-chk" title="Achica la pantalla y la baja para el mostrador"><input type="checkbox" id="compactoChk"> Modo compacto</label><span class="ajuste" id="ajusteAltura"><button type="button" id="bajarBtn" title="Bajar la pantalla" aria-label="Bajar la pantalla">▼</button><button type="button" id="subirBtn" title="Subir la pantalla" aria-label="Subir la pantalla">▲</button></span><span id="usuario"></span><span id="modo"></span><button id="logout" style="display:none">Salir</button></div>
   </div>
 </header>
 
@@ -617,6 +623,11 @@ document.addEventListener('keydown', e => { if (e.key === 'F2' && $('#caja').cla
 
 // Modo compacto: se recuerda en cada PC
 (function(){
+  let arriba = 120; try{ arriba = parseInt(localStorage.getItem('lilen_arriba'), 10); if (isNaN(arriba)) arriba = 120; }catch{}
+  const aplicar = () => { document.body.style.setProperty('--arriba', arriba + 'px'); try{ localStorage.setItem('lilen_arriba', arriba); }catch{} };
+  aplicar();
+  $('#bajarBtn').addEventListener('click', () => { arriba = Math.min(500, arriba + 20); aplicar(); });
+  $('#subirBtn').addEventListener('click', () => { arriba = Math.max(0, arriba - 20); aplicar(); });
   let on = false; try{ on = localStorage.getItem('lilen_compacto') === '1'; }catch{}
   const chk = $('#compactoChk'); chk.checked = on; document.body.classList.toggle('compacto', on);
   chk.addEventListener('change', () => {
