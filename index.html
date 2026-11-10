@@ -125,8 +125,8 @@ td.num,th.num{text-align:right}
 .lbl{width:50mm;height:25mm;border:1px dashed #bbb;padding:1mm 1.5mm;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3mm;overflow:hidden;background:#fff;color:#000;font-family:Arial,sans-serif;line-height:1.1}
 .lbl .n{font-size:7.5pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .lbl .n b{letter-spacing:1px}
-.lbl .p{font-size:12pt;font-weight:700}
-.lbl svg{max-width:100%;height:11mm}
+.lbl .p{font-size:17pt;font-weight:700;line-height:1}
+.lbl svg{max-width:100%;height:13mm}
 .labels.rollo{display:block}
 .labels.rollo .lbl{margin:0}
 @media print{.labels.rollo .lbl{height:23.5mm;break-after:page;page-break-after:always}.labels.rollo .lbl:last-child{break-after:auto;page-break-after:auto}}
@@ -689,7 +689,7 @@ function armarEtiquetas(){
     const it = activos().find(i => i.codigo === inp.dataset.c), n = Math.min(500, +inp.value || 0);
     for (let k = 0; k < n; k++){
       const d = document.createElement('div'); d.className = 'lbl';
-      d.innerHTML = `<div class="n"><b>${esc(CONFIG.NOMBRE_LOCAL)}</b> · ${esc(it.nombre)}</div>${conPrecio ? `<div class="p">${fmt(it.precio)}</div>` : ''}<svg></svg>`;
+      d.innerHTML = `${conPrecio ? `<div class="p">${fmt(it.precio)}</div>` : ''}<svg></svg>`;
       cont.appendChild(d);
       JsBarcode(d.querySelector('svg'), it.codigo, {format: 'CODE128', width: 2, height: 40, fontSize: 14, textMargin: 0, margin: 0, displayValue: true});
     }
