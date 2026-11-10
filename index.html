@@ -383,6 +383,8 @@ const CONFIG = {
         <label><input type="checkbox" id="etqPrecio" checked> Mostrar precio en la etiqueta</label>
         <button class="btn" id="etqPrev">Vista previa</button>
         <button class="btn pri" id="etqPrint">Imprimir etiquetas</button>
+        <button class="btn" id="etqLimpiar" type="button">Poner todo en 0</button>
+        <button class="btn" id="etqRepetir" type="button" hidden>↺ Repetir última tanda</button>
       </div>
       <p class="muted" style="font-size:13px">Rollo: una etiqueta por pegatina. En la ventana de impresión elegí la Xprinter, márgenes "Ninguno" y escala 100%.</p>
     </div>
@@ -688,7 +690,7 @@ async function actualizarHoy(){
 }
 
 /* ============ IMPRESIÓN ============ */
-function imprimir(html, tipo){
+function imprimir(html, tipo, despues){
   const area = $('#printArea'); area.innerHTML = html;
   if (tipo === 'ticket'){
     // Medimos el ticket para que la hoja tenga el largo justo y no gaste rollo de más
@@ -699,7 +701,7 @@ function imprimir(html, tipo){
   } else {
     $('#pageStyle').textContent = tipo === 'rollo' ? '@page{size:50mm 25mm;margin:0}' : '@page{size:A4;margin:8mm}';
   }
-  setTimeout(() => window.print(), 80);
+  setTimeout(() => { window.print(); if (despues) despues(); }, 80);
 }
 
 function imprimirTicket(v){
@@ -795,10 +797,22 @@ function armarEtiquetas(){
 }
 try{ const f = localStorage.getItem('lilen_etq_formato'); if (f) $('#etqFormato').value = f; }catch{}
 $('#etqPrev').onclick = () => { if (!armarEtiquetas()) alert('Poné la cantidad de etiquetas en al menos un artículo.'); };
+/* Cantidades: poner en 0, y después de imprimir se vacían solas (con opción de repetir la tanda) */
+let ultimaTanda = null;
+function leerCantidades(){ const c = {}; document.querySelectorAll('#tEtq input').forEach(i => { if (+i.value > 0) c[i.dataset.c] = i.value; }); return c; }
+function ponerEnCero(){ document.querySelectorAll('#tEtq input').forEach(i => i.value = 0); $('#etqPreview').innerHTML = ''; }
+$('#etqLimpiar').onclick = ponerEnCero;
+$('#etqRepetir').onclick = () => {
+  if (!ultimaTanda) return;
+  document.querySelectorAll('#tEtq input').forEach(i => i.value = ultimaTanda[i.dataset.c] || 0);
+  armarEtiquetas();
+};
 $('#etqPrint').onclick = () => {
   if (!armarEtiquetas()) return alert('Poné la cantidad de etiquetas en al menos un artículo.');
-  const f = $('#etqFormato').value;
-  imprimir(`<div class="labels ${f}">${$('#etqPreview').innerHTML}</div>`, f);
+  const f = $('#etqFormato').value, tanda = leerCantidades();
+  imprimir(`<div class="labels ${f}">${$('#etqPreview').innerHTML}</div>`, f, () => {
+    ultimaTanda = tanda; $('#etqRepetir').hidden = false; ponerEnCero();
+  });
 };
 
 /* ============ VENTAS ============
