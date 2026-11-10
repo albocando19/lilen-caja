@@ -31,39 +31,62 @@ body{margin:0;font-family:var(--f-texto);background:var(--bg);color:var(--ink)}
 .ajuste{display:none;gap:4px}
 .compacto .ajuste{display:inline-flex}
 .ajuste button{width:30px;height:28px;padding:0;border-radius:8px!important;font-size:12px}
-/* Espacio vacío arriba (lo que tapa la repisa); todo lo demás baja */
-body.compacto{padding-top:var(--arriba,120px)}
+/* MODO COMPACTO (mostrador): arriba queda vacío (lo tapa la repisa) y toda la caja entra en la mitad de abajo.
+   --arriba es el espacio vacío, en % de la altura de la pantalla; se ajusta con las flechas. */
+body.compacto{padding-top:calc(var(--arriba,50) * 1vh)}
 .compacto header{border-top:1px solid var(--oro-suave)}
-.compacto .cartel{min-height:40px;padding:4px 70px}
-.compacto .marca .nombre{font-size:15px}
-.compacto .marca .sub{display:none}
-.compacto .barra-nav{padding-top:4px;padding-bottom:4px}
-.compacto nav button{padding:5px 12px;font-size:14px}
-.compacto .hdr-right{font-size:12px;gap:6px}
-.compacto main{padding-block:8px}
-.compacto .card{padding:10px 12px;margin-bottom:8px;border-radius:12px}
-.compacto h2{font-size:12px;margin:0 0 6px}
-.compacto .caja{grid-template-columns:1fr 300px;gap:10px}
-.compacto #scan{font-size:17px;padding:8px 10px}
-.compacto #scanMsg{min-height:16px;margin-top:3px;font-size:12px}
-.compacto th,.compacto td{padding:4px 6px;font-size:14px}
-.compacto .quick{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:5px}
-.compacto .quick button{padding:5px 8px;border-radius:9px}
-.compacto .quick b{font-size:13px}
-.compacto .quick small{font-size:11px}
-.compacto select,.compacto input{font-size:14px;padding:6px 9px}
-.compacto .desc{gap:4px;margin:2px 0 6px}
-.compacto .desc button{padding:4px 9px;font-size:13px}
-.compacto .desc input{width:70px;padding:4px 7px;font-size:13px}
-.compacto .subt{font-size:13px}
-.compacto .total{font-size:32px;margin:0 0 6px}
-.compacto .vuelto{padding:6px 9px;margin:0 0 6px}
-.compacto .vuelto input{font-size:16px;padding:5px 8px}
-.compacto .vuelto .res{font-size:18px;margin-top:3px}
-.compacto button.big{font-size:17px;padding:10px 16px}
-.compacto button.btn{padding:6px 12px;font-size:14px}
-.compacto .stat{padding:10px}
-.compacto .stat .v{font-size:22px}
+.compacto .cartel{display:none}
+.compacto .barra-nav{padding-top:3px;padding-bottom:3px;gap:8px}
+.compacto nav{gap:2px}
+.compacto nav button{padding:3px 11px;font-size:13px}
+.compacto .hdr-right{font-size:11px;gap:5px}
+.compacto .compacto-chk{padding:2px 8px}
+.compacto .hdr-right button{padding:2px 9px}
+.compacto main{padding-block:5px}
+.compacto .card{padding:6px 9px;margin-bottom:5px;border-radius:10px}
+.compacto .caja{grid-template-columns:minmax(0,1fr) 290px;gap:6px}
+.caja > div{min-width:0}
+.compacto .cTit,.compacto .cLbl,.compacto .hoyCard,.compacto #cartEmpty{display:none}
+/* código */
+.compacto #scan{font-size:15px;padding:5px 9px;border-width:2px}
+.compacto #scanMsg{min-height:0;margin-top:2px;font-size:11px}
+.compacto #scanMsg:empty{display:none}
+/* venta actual: solo unas filas, el resto con scroll */
+.compacto .ventaCard{max-height:calc((100 - var(--arriba,50)) * 1vh - 190px);min-height:62px;overflow-y:auto}
+.compacto th,.compacto td{padding:2px 5px;font-size:13px}
+.compacto th{font-size:10px}
+.compacto .qty button{width:22px;height:22px;font-size:12px}
+.compacto td .btn{padding:1px 7px!important;font-size:12px}
+/* carga rápida: una sola fila que se desliza */
+.compacto .quick{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;padding-bottom:2px;scrollbar-width:thin}
+.compacto .quick button{flex:none;min-width:72px;padding:3px 7px;border-radius:8px}
+.compacto .quick b{font-size:11px}
+.compacto .quick small{font-size:10px}
+/* panel de cobro */
+.compacto #medio{margin:0 0 4px!important;font-size:13px;padding:3px 7px}
+.compacto .desc{gap:3px;margin:0 0 3px;flex-wrap:nowrap}
+.compacto .desc button{padding:2px 7px;font-size:12px;white-space:nowrap}
+.compacto .desc input{width:46px;padding:2px 5px;font-size:12px}
+.compacto .subt{font-size:12px;line-height:1.2}
+.compacto .totalFila{display:flex;justify-content:space-between;align-items:baseline}
+.compacto .totalFila .muted{margin:0!important;font-size:13px}
+.compacto .total{font-size:26px;margin:0 0 3px}
+.compacto .vuelto{display:flex;align-items:center;gap:6px;padding:3px 6px;margin:0 0 3px;border-radius:8px}
+.compacto .vuelto:not([hidden]){display:flex}
+.compacto .vuelto input{flex:1;min-width:0;font-size:13px;padding:3px 7px}
+.compacto .vuelto input::placeholder{color:var(--muted)}
+.compacto .vuelto .res{font-size:14px;margin:0;white-space:nowrap}
+.compacto .imprimirLbl{margin:0 0 3px!important;font-size:12px!important}
+.compacto .imprimirLbl input{width:14px!important;height:14px!important}
+.compacto .accionesCobro{display:grid;grid-template-columns:2fr 1fr;gap:5px}
+.compacto .accionesCobro .btn{margin:0!important;padding:6px 8px;font-size:13px}
+.compacto .accionesCobro .big{font-size:15px}
+.compacto select,.compacto input{border-radius:8px}
+/* otras pestañas, también más apretadas */
+.compacto h2{font-size:12px;margin:0 0 4px}
+.compacto .stat{padding:8px}
+.compacto .stat .v{font-size:20px}
+.compacto button.btn{padding:5px 10px;font-size:13px}
 @media(max-width:860px){.compacto .caja{grid-template-columns:1fr}}
 /* Encabezado */
 header{background:var(--card);border-bottom:1px solid var(--oro-suave)}
@@ -250,8 +273,8 @@ const CONFIG = {
           </div>
           <div id="scanMsg"></div>
         </div>
-        <div class="card">
-          <h2>Venta actual</h2>
+        <div class="card ventaCard">
+          <h2 class="cTit">Venta actual</h2>
           <table>
             <thead><tr><th>Artículo</th><th class="num">Precio</th><th>Cant.</th><th class="num">Subtotal</th><th></th></tr></thead>
             <tbody id="cart"></tbody>
@@ -259,30 +282,32 @@ const CONFIG = {
           <p id="cartEmpty" class="muted">Todavía no hay artículos.</p>
         </div>
         <div class="card">
-          <h2>Carga rápida <span class="muted" style="font-weight:400;font-size:13px">(si no lee el código)</span></h2>
+          <h2 class="cTit">Carga rápida <span class="muted" style="font-weight:400;font-size:13px">(si no lee el código)</span></h2>
           <div id="quick" class="quick"></div>
         </div>
       </div>
       <div>
         <div class="card">
-          <label class="muted" style="font-size:13px" for="medio">Medio de pago</label>
+          <label class="muted cLbl" style="font-size:13px" for="medio">Medio de pago</label>
           <select id="medio" style="width:100%;margin:4px 0 12px"></select>
-          <div class="muted" style="font-size:13px">Descuento</div>
+          <div class="muted cLbl" style="font-size:13px">Descuento</div>
           <div class="desc" id="descBtns"></div>
           <div class="subt" id="subtRow" hidden><span>Subtotal</span><span id="subtotal">$ 0</span></div>
           <div class="subt ahorro" id="descRow" hidden><span id="descLbl">Descuento</span><span id="descMonto">−$ 0</span></div>
-          <div class="muted" style="margin-top:6px">Total</div>
-          <div class="total" id="total">$ 0</div>
+          <div class="totalFila"><div class="muted" style="margin-top:6px">Total</div>
+          <div class="total" id="total">$ 0</div></div>
           <div class="vuelto" id="vueltoBox" hidden>
-            <label for="pagaCon" class="muted" style="font-size:13px">Paga con (opcional)</label>
-            <input id="pagaCon" type="text" inputmode="numeric" placeholder="$ 0" autocomplete="off">
+            <label for="pagaCon" class="muted cLbl" style="font-size:13px">Paga con (opcional)</label>
+            <input id="pagaCon" type="text" inputmode="numeric" placeholder="Paga con $…" autocomplete="off">
             <div class="res" id="vueltoRes" hidden></div>
           </div>
-          <label class="row" style="margin-bottom:12px;font-size:15px"><input type="checkbox" id="imprimirChk" checked style="width:18px;height:18px"> Imprimir recibo</label>
-          <button class="btn pri big" id="cobrar" disabled>Cobrar (F2)</button>
-          <button class="btn" id="vaciar" style="width:100%;margin-top:8px">Vaciar venta</button>
+          <label class="row imprimirLbl" style="margin-bottom:12px;font-size:15px"><input type="checkbox" id="imprimirChk" checked style="width:18px;height:18px"> Imprimir recibo</label>
+          <div class="accionesCobro">
+            <button class="btn pri big" id="cobrar" disabled>Cobrar (F2)</button>
+            <button class="btn" id="vaciar" style="width:100%;margin-top:8px">Vaciar venta</button>
+          </div>
         </div>
-        <div class="card soloAdmin" hidden>
+        <div class="card soloAdmin hoyCard" hidden>
           <div class="muted">Vendido hoy</div>
           <div style="font-size:26px;font-weight:700" id="hoyTotal">$ 0</div>
           <div class="muted" id="hoyCant">0 ventas</div>
@@ -623,11 +648,11 @@ document.addEventListener('keydown', e => { if (e.key === 'F2' && $('#caja').cla
 
 // Modo compacto: se recuerda en cada PC
 (function(){
-  let arriba = 120; try{ arriba = parseInt(localStorage.getItem('lilen_arriba'), 10); if (isNaN(arriba)) arriba = 120; }catch{}
-  const aplicar = () => { document.body.style.setProperty('--arriba', arriba + 'px'); try{ localStorage.setItem('lilen_arriba', arriba); }catch{} };
+  let arriba = 50; try{ arriba = parseInt(localStorage.getItem('lilen_arriba_pct'), 10); if (isNaN(arriba)) arriba = 50; }catch{}
+  const aplicar = () => { document.body.style.setProperty('--arriba', arriba); try{ localStorage.setItem('lilen_arriba_pct', arriba); }catch{} };
   aplicar();
-  $('#bajarBtn').addEventListener('click', () => { arriba = Math.min(500, arriba + 20); aplicar(); });
-  $('#subirBtn').addEventListener('click', () => { arriba = Math.max(0, arriba - 20); aplicar(); });
+  $('#bajarBtn').addEventListener('click', () => { arriba = Math.min(70, arriba + 5); aplicar(); });
+  $('#subirBtn').addEventListener('click', () => { arriba = Math.max(0, arriba - 5); aplicar(); });
   let on = false; try{ on = localStorage.getItem('lilen_compacto') === '1'; }catch{}
   const chk = $('#compactoChk'); chk.checked = on; document.body.classList.toggle('compacto', on);
   chk.addEventListener('change', () => {
