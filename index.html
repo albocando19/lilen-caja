@@ -80,7 +80,9 @@ td.num,th.num{text-align:right}
 /* Caja */
 .caja{display:grid;grid-template-columns:1fr 360px;gap:16px}
 @media(max-width:860px){.caja{grid-template-columns:1fr}}
-#scan{width:100%;font-size:22px;padding:14px;border:2px solid var(--acc)}
+#scan{width:100%;min-width:0;font-size:22px;padding:14px;border:2px solid var(--acc)}
+.scanfila{display:flex;gap:8px;align-items:stretch}
+.scanfila .btn{white-space:nowrap;flex:none}
 #scanMsg{min-height:22px;margin-top:6px;font-size:14px}
 .err{color:var(--bad)}.okc{color:var(--ok)}
 .quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
@@ -201,7 +203,10 @@ const CONFIG = {
     <div class="caja">
       <div>
         <div class="card">
+          <div class="scanfila">
           <input id="scan" name="codigo-barras" type="search" inputmode="numeric" placeholder="Pasá el código de barras (o escribilo y Enter)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other" readonly>
+          <button type="button" class="btn" id="tecladoBtn" hidden aria-label="Abrir el teclado para escribir un código">⌨ Teclado</button>
+          </div>
           <div id="scanMsg"></div>
         </div>
         <div class="card">
@@ -575,6 +580,14 @@ async function cobrar(){
 $('#cobrar').onclick = cobrar;
 document.addEventListener('keydown', e => { if (e.key === 'F2' && $('#caja').classList.contains('on')){ e.preventDefault(); cobrar(); } });
 
+// En tablets y celulares el campo se selecciona igual (para un lector Bluetooth),
+// pero sin abrir el teclado de la pantalla. El botón "Teclado" lo abre a mano.
+const esTactil = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
+if (esTactil){
+  const sc = $('#scan'); sc.inputMode = 'none'; $('#tecladoBtn').hidden = false;
+  $('#tecladoBtn').addEventListener('click', () => { sc.inputMode = 'numeric'; sc.blur(); setTimeout(() => sc.focus(), 30); });
+  sc.addEventListener('blur', () => { sc.inputMode = 'none'; });
+}
 // Que el lector siempre escriba en el campo de código
 document.addEventListener('click', e => {
   if ($('#caja').classList.contains('on') && !e.target.closest('input,select,button,label')) $('#scan').focus();
