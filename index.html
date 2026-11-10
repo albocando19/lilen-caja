@@ -42,7 +42,9 @@ body.compacto{padding-top:calc(var(--arriba,50) * 1vh)}
 .compacto .hdr-right{font-size:11px;gap:5px}
 .compacto .compacto-chk{padding:2px 8px}
 .compacto .hdr-right button{padding:2px 9px}
-.compacto main{padding-block:5px}
+.compacto main{padding-block:5px;max-width:min(1040px,80vw)}
+.compacto .barra-nav{max-width:min(1040px,80vw)}
+@media(max-width:900px){.compacto main,.compacto .barra-nav{max-width:none}}
 .compacto .card{padding:6px 9px;margin-bottom:5px;border-radius:10px}
 .compacto .caja{grid-template-columns:minmax(0,1fr) 290px;gap:6px}
 .caja > div{min-width:0}
