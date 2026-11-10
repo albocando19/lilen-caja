@@ -23,7 +23,42 @@
   --f-texto:'Jost', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;font-family:var(--f-texto);background:var(--bg);color:var(--ink)}
+/* Modo compacto: para el mostrador, donde la repisa tapa arriba y la pantalla es chica */
+.compacto-chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--ink);font-weight:500;padding:4px 10px;border:1px solid var(--rosa-borde);border-radius:999px;background:#fff}
+.compacto-chk input{width:16px;height:16px;padding:0;accent-color:var(--acc)}
+.compacto .cartel{min-height:40px;padding:4px 70px}
+.compacto .marca .nombre{font-size:15px}
+.compacto .marca .sub{display:none}
+.compacto .barra-nav{padding-top:4px;padding-bottom:4px}
+.compacto nav button{padding:5px 12px;font-size:14px}
+.compacto .hdr-right{font-size:12px;gap:6px}
+.compacto main{padding-block:8px}
+.compacto .card{padding:10px 12px;margin-bottom:8px;border-radius:12px}
+.compacto h2{font-size:12px;margin:0 0 6px}
+.compacto .caja{grid-template-columns:1fr 300px;gap:10px}
+.compacto #scan{font-size:17px;padding:8px 10px}
+.compacto #scanMsg{min-height:16px;margin-top:3px;font-size:12px}
+.compacto th,.compacto td{padding:4px 6px;font-size:14px}
+.compacto .quick{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:5px}
+.compacto .quick button{padding:5px 8px;border-radius:9px}
+.compacto .quick b{font-size:13px}
+.compacto .quick small{font-size:11px}
+.compacto select,.compacto input{font-size:14px;padding:6px 9px}
+.compacto .desc{gap:4px;margin:2px 0 6px}
+.compacto .desc button{padding:4px 9px;font-size:13px}
+.compacto .desc input{width:70px;padding:4px 7px;font-size:13px}
+.compacto .subt{font-size:13px}
+.compacto .total{font-size:32px;margin:0 0 6px}
+.compacto .vuelto{padding:6px 9px;margin:0 0 6px}
+.compacto .vuelto input{font-size:16px;padding:5px 8px}
+.compacto .vuelto .res{font-size:18px;margin-top:3px}
+.compacto button.big{font-size:17px;padding:10px 16px}
+.compacto button.btn{padding:6px 12px;font-size:14px}
+.compacto .stat{padding:10px}
+.compacto .stat .v{font-size:22px}
+@media(max-width:860px){.compacto .caja{grid-template-columns:1fr}}
 /* Encabezado */
 header{background:var(--card);border-bottom:1px solid var(--oro-suave)}
 .cartel{position:relative;display:flex;justify-content:center;align-items:center;min-height:96px;padding:10px 140px;overflow:hidden}
@@ -188,7 +223,7 @@ const CONFIG = {
     <button data-t="articulos">Artículos</button>
     <button data-t="etiquetas">Etiquetas</button>
   </nav>
-  <div class="hdr-right"><span id="usuario"></span><span id="modo"></span><button id="logout" style="display:none">Salir</button></div>
+  <div class="hdr-right"><label class="compacto-chk" title="Achica la pantalla para que entre todo en el mostrador"><input type="checkbox" id="compactoChk"> Modo compacto</label><span id="usuario"></span><span id="modo"></span><button id="logout" style="display:none">Salir</button></div>
   </div>
 </header>
 
@@ -580,6 +615,17 @@ async function cobrar(){
 $('#cobrar').onclick = cobrar;
 document.addEventListener('keydown', e => { if (e.key === 'F2' && $('#caja').classList.contains('on')){ e.preventDefault(); cobrar(); } });
 
+// Modo compacto: se recuerda en cada PC
+(function(){
+  let on = false; try{ on = localStorage.getItem('lilen_compacto') === '1'; }catch{}
+  const chk = $('#compactoChk'); chk.checked = on; document.body.classList.toggle('compacto', on);
+  chk.addEventListener('change', () => {
+    document.body.classList.toggle('compacto', chk.checked);
+    try{ localStorage.setItem('lilen_compacto', chk.checked ? '1' : '0'); }catch{}
+    if (typeof dibujarGraficos === 'function') dibujarGraficos();
+    $('#scan').focus();
+  });
+})();
 // En tablets y celulares el campo se selecciona igual (para un lector Bluetooth),
 // pero sin abrir el teclado de la pantalla. El botón "Teclado" lo abre a mano.
 const esTactil = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
