@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lilén Márquez · Caja</title>
 <meta name="theme-color" content="#c8186a">
+<script>try{document.documentElement.dataset.tema=localStorage.getItem('lilen_tema')||'oscuro'}catch(e){document.documentElement.dataset.tema='oscuro'}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Jost:wght@400;500;600;700&display=swap">
@@ -19,15 +20,33 @@
   --acc:#c8186a; --acc-hover:#a31256; --acc-ink:#fff;
   --rosa:#fdeef4; --rosa-borde:#f4c6d9; --oro:#c7a04c; --oro-suave:#e8d6ab;
   --ok:#2e7d4f; --bad:#b3261e;
+  --campo:#fff; --tip-ink:#fff;
+  --aviso-off-bg:#fde8e6; --aviso-off-borde:#f1a9a2; --aviso-off-ink:#8c1d14;
+  --aviso-sub-bg:#e7f1fb; --aviso-sub-borde:#a9c8ea; --aviso-sub-ink:#1d4f8c;
+  --banner-bg:#fbf4e3; --danger-borde:#f1c9c6;
+  color-scheme:light;
   --f-marca:'Cinzel', 'Trajan Pro', Georgia, serif;
   --f-texto:'Jost', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+/* Modo oscuro (el que se usa por defecto): fondo ciruela muy oscuro, rosa peonía más vivo para que resalte */
+:root[data-tema="oscuro"]{
+  --bg:#16111a; --card:#211922; --ink:#f4eaef; --muted:#b5a3ad; --line:#382a34;
+  --acc:#e2438c; --acc-hover:#f2629f; --acc-ink:#fff;
+  --rosa:#3a2131; --rosa-borde:#5c3549; --oro:#d6b366; --oro-suave:#5c4b2b;
+  --ok:#62c98e; --bad:#ff7b72;
+  --campo:#2a2030; --tip-ink:#16111a;
+  --aviso-off-bg:#3d1a1a; --aviso-off-borde:#7a3330; --aviso-off-ink:#ffb4ab;
+  --aviso-sub-bg:#17283d; --aviso-sub-borde:#2f4f73; --aviso-sub-ink:#a9cbf2;
+  --banner-bg:#2e2716; --danger-borde:#6b2f2c;
+  color-scheme:dark;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;font-family:var(--f-texto);background:var(--bg);color:var(--ink)}
 /* Modo compacto: para el mostrador, donde la repisa tapa arriba y la pantalla es chica */
-.compacto-chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--ink);font-weight:500;padding:4px 10px;border:1px solid var(--rosa-borde);border-radius:999px;background:#fff}
+.compacto-chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--ink);font-weight:500;padding:4px 10px;border:1px solid var(--rosa-borde);border-radius:999px;background:var(--campo)}
 .compacto-chk input{width:16px;height:16px;padding:0;accent-color:var(--acc)}
+.tema-btn{border:1px solid var(--rosa-borde)!important;background:var(--campo)!important;border-radius:999px!important}
 .ajuste{display:none;gap:4px}
 .compacto .ajuste{display:inline-flex}
 .ajuste button{width:30px;height:28px;padding:0;border-radius:8px!important;font-size:12px}
@@ -92,15 +111,15 @@ body.compacto{padding-top:calc(var(--arriba,50) * 1vh)}
 @media(max-width:860px){.compacto .caja{grid-template-columns:1fr}}
 /* Encabezado */
 header{background:var(--card);border-bottom:1px solid var(--oro-suave)}
-.cartel{position:relative;display:flex;justify-content:center;align-items:center;min-height:96px;padding:10px 140px;overflow:hidden}
+.cartel{background:#fff;position:relative;display:flex;justify-content:center;align-items:center;min-height:96px;padding:10px 140px;overflow:hidden}
 .cartel .flor{position:absolute;top:0;height:100%;width:auto;pointer-events:none;user-select:none}
 .cartel .flor.izq{left:0;-webkit-mask-image:linear-gradient(to right,#000 55%,transparent);mask-image:linear-gradient(to right,#000 55%,transparent)}
 .cartel .flor.der{right:0;-webkit-mask-image:linear-gradient(to left,#000 55%,transparent);mask-image:linear-gradient(to left,#000 55%,transparent)}
 .marca{text-align:center;line-height:1}
-.marca .nombre{font-family:var(--f-marca);font-weight:700;font-size:30px;letter-spacing:.06em;color:var(--ink);margin:0}
-.marca .sub{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px;font-family:var(--f-marca);font-size:11px;letter-spacing:.42em;color:var(--ink)}
-.marca .sub::before,.marca .sub::after{content:"";height:1px;width:46px;background:var(--oro)}
-.marca .sub b{color:var(--oro);font-weight:400;letter-spacing:0;font-size:13px}
+.marca .nombre{font-family:var(--f-marca);font-weight:700;font-size:30px;letter-spacing:.06em;color:#221c1f;margin:0}
+.marca .sub{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px;font-family:var(--f-marca);font-size:11px;letter-spacing:.42em;color:#221c1f}
+.marca .sub::before,.marca .sub::after{content:"";height:1px;width:46px;background:#c7a04c}
+.marca .sub b{color:#c7a04c;font-weight:400;letter-spacing:0;font-size:13px}
 .barra-nav{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));border-top:1px solid var(--line);max-width:1200px;margin:0 auto}
 nav{display:flex;gap:6px;flex-wrap:wrap}
 nav button{background:transparent;color:var(--ink);border:1px solid transparent;padding:8px 16px;border-radius:999px;cursor:pointer;font:500 15px var(--f-texto);letter-spacing:.02em}
@@ -122,16 +141,16 @@ main{padding-block:20px;padding-left:max(16px,env(safe-area-inset-left,0px));pad
 .card{overflow-x:auto;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
 h2{font-family:var(--f-marca);font-weight:600;font-size:15px;letter-spacing:.06em;margin:0 0 12px}
 h2 .muted{font-family:var(--f-texto);letter-spacing:0}
-input,select{font:16px var(--f-texto);padding:10px 12px;border:1px solid var(--rosa-borde);border-radius:10px;background:#fff;color:var(--ink)}
+input,select{font:16px var(--f-texto);padding:10px 12px;border:1px solid var(--rosa-borde);border-radius:10px;background:var(--campo);color:var(--ink)}
 input:focus,select:focus{outline:2px solid var(--acc);outline-offset:1px;border-color:var(--acc)}
 button{font-family:var(--f-texto)}
 button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-button.btn{font-size:15px;padding:10px 16px;border-radius:10px;border:1px solid var(--rosa-borde);background:#fff;color:var(--ink);cursor:pointer}
+button.btn{font-size:15px;padding:10px 16px;border-radius:10px;border:1px solid var(--rosa-borde);background:var(--campo);color:var(--ink);cursor:pointer}
 button.btn:hover{background:var(--rosa)}
 button.pri{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600;letter-spacing:.03em}
 button.pri:hover{background:var(--acc-hover);border-color:var(--acc-hover)}
 button.big{font-size:20px;padding:16px 22px;width:100%}
-button.danger{color:var(--bad);border-color:#f1c9c6}
+button.danger{color:var(--bad);border-color:var(--danger-borde)}
 button:disabled{opacity:.5;cursor:default}
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);font-size:15px}
@@ -140,9 +159,9 @@ td.num,th.num{text-align:right}
 .muted{color:var(--muted)}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .aviso{display:none;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:15px;font-weight:600}
-.aviso.off{display:block;background:#fde8e6;border:1px solid #f1a9a2;color:#8c1d14}
-.aviso.sub{display:block;background:#e7f1fb;border:1px solid #a9c8ea;color:#1d4f8c}
-.banner{padding:10px 14px;border-radius:10px;margin-bottom:16px;font-size:14px;background:#fbf4e3;border:1px solid var(--oro-suave)}
+.aviso.off{display:block;background:var(--aviso-off-bg);border:1px solid var(--aviso-off-borde);color:var(--aviso-off-ink)}
+.aviso.sub{display:block;background:var(--aviso-sub-bg);border:1px solid var(--aviso-sub-borde);color:var(--aviso-sub-ink)}
+.banner{padding:10px 14px;border-radius:10px;margin-bottom:16px;font-size:14px;background:var(--banner-bg);border:1px solid var(--oro-suave)}
 /* Caja */
 .caja{display:grid;grid-template-columns:1fr 360px;gap:16px}
 @media(max-width:860px){.caja{grid-template-columns:1fr}}
@@ -152,11 +171,11 @@ td.num,th.num{text-align:right}
 #scanMsg{min-height:22px;margin-top:6px;font-size:14px}
 .err{color:var(--bad)}.okc{color:var(--ok)}
 .quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
-.quick button{padding:12px 10px;border-radius:12px;border:1px solid var(--rosa-borde);background:#fff;cursor:pointer;text-align:left;color:var(--ink)}
+.quick button{padding:12px 10px;border-radius:12px;border:1px solid var(--rosa-borde);background:var(--campo);cursor:pointer;text-align:left;color:var(--ink)}
 .quick button:hover{background:var(--rosa);border-color:var(--acc)}
 .quick b{display:block;font-size:14px}.quick small{color:var(--muted)}
 .desc{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px;align-items:center}
-.desc button{padding:7px 12px;border-radius:999px;border:1px solid var(--rosa-borde);background:#fff;color:var(--ink);cursor:pointer;font-size:14px;font-variant-numeric:tabular-nums}
+.desc button{padding:7px 12px;border-radius:999px;border:1px solid var(--rosa-borde);background:var(--campo);color:var(--ink);cursor:pointer;font-size:14px;font-variant-numeric:tabular-nums}
 .desc button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
 .desc input{width:84px;padding:7px 8px;font-size:14px}
 .subt{display:flex;justify-content:space-between;font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -168,7 +187,7 @@ td.num,th.num{text-align:right}
 .vuelto .res.falta{color:var(--bad)}
 .total{font-size:44px;font-weight:700;text-align:right;margin:4px 0 12px;font-variant-numeric:tabular-nums}
 .qty{display:inline-flex;align-items:center;gap:6px}
-.qty button{width:28px;height:28px;border-radius:999px;border:1px solid var(--rosa-borde);background:#fff;color:var(--ink);cursor:pointer}
+.qty button{width:28px;height:28px;border-radius:999px;border:1px solid var(--rosa-borde);background:var(--campo);color:var(--ink);cursor:pointer}
 /* Ventas */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
@@ -185,7 +204,7 @@ td.num,th.num{text-align:right}
 .grafs{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:860px){.grafs{grid-template-columns:1fr}}
 .grafs .card{min-width:0}
-.tip{position:fixed;pointer-events:none;background:var(--ink);color:#fff;font-size:13px;padding:6px 9px;border-radius:6px;z-index:20;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--tip-ink);font-size:13px;padding:6px 9px;border-radius:6px;z-index:20;white-space:nowrap;font-variant-numeric:tabular-nums}
 .delta{font-weight:600}.delta.up{color:var(--ok)}.delta.down{color:var(--bad)}
 .anulada td{text-decoration:line-through;color:var(--muted)}
 /* Etiquetas */
@@ -197,7 +216,9 @@ td.num,th.num{text-align:right}
 .lbl svg{max-width:100%;height:13mm}
 .labels.rollo{display:block}
 .labels.rollo .lbl{margin:0}
-@media print{.labels.rollo .lbl{height:23.5mm;break-after:page;page-break-after:always}.labels.rollo .lbl:last-child{break-after:auto;page-break-after:auto}}
+@media print{
+  :root{color-scheme:light}
+  body{background:#fff!important;color:#000!important}.labels.rollo .lbl{height:23.5mm;break-after:page;page-break-after:always}.labels.rollo .lbl:last-child{break-after:auto;page-break-after:auto}}
 /* Login */
 #login{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:10}
 #login .card{width:340px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 10px 40px rgba(200,24,106,.12)}
@@ -254,7 +275,7 @@ const CONFIG = {
     <button data-t="articulos">Artículos</button>
     <button data-t="etiquetas">Etiquetas</button>
   </nav>
-  <div class="hdr-right"><label class="compacto-chk" title="Achica la pantalla y la baja para el mostrador"><input type="checkbox" id="compactoChk"> Modo compacto</label><span class="ajuste" id="ajusteAltura"><button type="button" id="bajarBtn" title="Bajar la pantalla" aria-label="Bajar la pantalla">▼</button><button type="button" id="subirBtn" title="Subir la pantalla" aria-label="Subir la pantalla">▲</button></span><span id="usuario"></span><span id="modo"></span><button id="logout" style="display:none">Salir</button></div>
+  <div class="hdr-right"><label class="compacto-chk" title="Achica la pantalla y la baja para el mostrador"><input type="checkbox" id="compactoChk"> Modo compacto</label><button type="button" id="temaBtn" class="tema-btn" title="Cambiar entre modo oscuro y claro"></button><span class="ajuste" id="ajusteAltura"><button type="button" id="bajarBtn" title="Bajar la pantalla" aria-label="Bajar la pantalla">▼</button><button type="button" id="subirBtn" title="Subir la pantalla" aria-label="Subir la pantalla">▲</button></span><span id="usuario"></span><span id="modo"></span><button id="logout" style="display:none">Salir</button></div>
   </div>
 </header>
 
@@ -650,6 +671,17 @@ async function cobrar(){
 $('#cobrar').onclick = cobrar;
 document.addEventListener('keydown', e => { if (e.key === 'F2' && $('#caja').classList.contains('on')){ e.preventDefault(); cobrar(); } });
 
+// Tema oscuro/claro: se recuerda en cada PC (por defecto oscuro, se ve mejor el mouse)
+(function(){
+  const b = $('#temaBtn');
+  const pintar = () => { const osc = document.documentElement.dataset.tema !== 'claro'; b.textContent = osc ? '☀ Claro' : '☾ Oscuro'; };
+  b.addEventListener('click', () => {
+    const nuevo = document.documentElement.dataset.tema === 'claro' ? 'oscuro' : 'claro';
+    document.documentElement.dataset.tema = nuevo; try{ localStorage.setItem('lilen_tema', nuevo); }catch{}
+    pintar(); if (typeof dibujarGraficos === 'function') dibujarGraficos();
+  });
+  pintar();
+})();
 // Modo compacto: se recuerda en cada PC
 (function(){
   let arriba = 50; try{ arriba = parseInt(localStorage.getItem('lilen_arriba_pct'), 10); if (isNaN(arriba)) arriba = 50; }catch{}
