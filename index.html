@@ -177,6 +177,8 @@ td.num,th.num{text-align:right}
 .desc{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px;align-items:center}
 .desc button{padding:7px 12px;border-radius:999px;border:1px solid var(--rosa-borde);background:var(--campo);color:var(--ink);cursor:pointer;font-size:14px;font-variant-numeric:tabular-nums}
 .desc button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.desc.rec button.on{background:var(--oro);border-color:var(--oro);color:#1d1608}
+.subt.recargo{color:var(--oro)}
 .desc input{width:84px;padding:7px 8px;font-size:14px}
 .subt{display:flex;justify-content:space-between;font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
 .subt.ahorro{color:var(--ok)}
@@ -256,6 +258,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: 'sb_publishable_5fSvvUgb3kU5zIxmQFWJHg_CKP508Do',
   MEDIOS_PAGO: ['Efectivo','Débito','Crédito','Transferencia','QR / Mercado Pago'],
   DESCUENTOS_RAPIDOS: [0, 5, 10, 15, 20],   // botones de descuento (opcional, arranca en "Sin desc.")
+  RECARGOS_RAPIDOS: [0, 5, 10, 15, 20],     // botones de recargo, ej. 10% por transferencia (opcional, arranca en "Sin recargo")
 };
 </script>
 
@@ -315,8 +318,11 @@ const CONFIG = {
           <select id="medio" style="width:100%;margin:4px 0 12px"></select>
           <div class="muted cLbl" style="font-size:13px">Descuento</div>
           <div class="desc" id="descBtns"></div>
+          <div class="muted cLbl" style="font-size:13px">Recargo</div>
+          <div class="desc rec" id="recBtns"></div>
           <div class="subt" id="subtRow" hidden><span>Subtotal</span><span id="subtotal">$ 0</span></div>
           <div class="subt ahorro" id="descRow" hidden><span id="descLbl">Descuento</span><span id="descMonto">−$ 0</span></div>
+          <div class="subt recargo" id="recRow" hidden><span id="recLbl">Recargo</span><span id="recMonto">+$ 0</span></div>
           <div class="totalFila"><div class="muted" style="margin-top:6px">Total</div>
           <div class="total" id="total">$ 0</div></div>
           <div class="vuelto" id="vueltoBox" hidden>
@@ -474,6 +480,7 @@ const Local = {
     return {
       total: ok.reduce((s,v) => s + Number(v.total), 0), cantidad: ok.length,
       descuentos: ok.reduce((s,v) => s + Number(v.descuento || 0), 0),
+      recargos: ok.reduce((s,v) => s + Number(v.recargo || 0), 0),
       por_item: Object.entries(it).map(([nombre,x]) => ({nombre, ...x})).sort((a,b) => b.t - a.t),
       por_medio: Object.entries(me).map(([medio,x]) => ({medio, ...x})).sort((a,b) => b.t - a.t),
     };
@@ -505,6 +512,7 @@ const Remote = {
       p_total: s.total, p_medio: s.medio_pago, p_items: s.items,
       p_cliente_id: s.cliente_id || null, p_fecha: s.fecha || null,
       p_subtotal: s.subtotal ?? null, p_descuento_pct: s.descuento_pct || 0,
+      ...(s.recargo_pct ? {p_recargo_pct: s.recargo_pct} : {}),
     }).abortSignal(AbortSignal.timeout(8000));
     if (error) throw error; return data;
   },
@@ -529,7 +537,7 @@ const Remote = {
   async resumen(desde, hasta){
     const {data, error} = await sb.rpc('resumen_ventas', {p_desde: desde.toISOString(), p_hasta: hasta.toISOString()});
     if (error) throw error;
-    return {...data, total: Number(data.total), cantidad: Number(data.cantidad), descuentos: Number(data.descuentos || 0)};
+    return {...data, total: Number(data.total), cantidad: Number(data.cantidad), descuentos: Number(data.descuentos || 0), recargos: Number(data.recargos || 0)};
   },
   async graficos(desde, hasta){
     const {data, error} = await sb.rpc('graficos_ventas', {p_desde: desde.toISOString(), p_hasta: hasta.toISOString()});
@@ -578,15 +586,25 @@ $('#scan').addEventListener('keydown', e => {
 
 let descPct = 0;
 function subtotalCart(){ return cart.reduce((s,l) => s + l.precio * l.cant, 0); }
+let recPct = 0;
 function descuentoCart(){ return Math.round(subtotalCart() * descPct / 100); }
-function totalCart(){ return subtotalCart() - descuentoCart(); }
+// El recargo se calcula sobre lo que queda después del descuento (igual que en la base)
+function recargoCart(){ return Math.round((subtotalCart() - descuentoCart()) * recPct / 100); }
+function totalCart(){ return subtotalCart() - descuentoCart() + recargoCart(); }
 function numPesos(txt){ return Math.round(Number(String(txt).replace(/[^\d,]/g, '').replace(',', '.')) || 0); }
 
-function renderDesc(){
-  const rapidos = CONFIG.DESCUENTOS_RAPIDOS, otro = !rapidos.includes(descPct);
-  $('#descBtns').innerHTML = rapidos.map(p => `<button type="button" data-p="${p}" class="${p === descPct ? 'on' : ''}">${p ? p + '%' : 'Sin desc.'}</button>`).join('')
-    + `<input id="descOtro" type="number" min="0" max="100" step="1" placeholder="otro %" value="${otro ? descPct : ''}" class="${otro ? 'on' : ''}" aria-label="Otro descuento en %">`;
+function chipsPct(cont, rapidos, valor, txt0, idOtro, aria){
+  const otro = !rapidos.includes(valor);
+  cont.innerHTML = rapidos.map(p => `<button type="button" data-p="${p}" class="${p === valor ? 'on' : ''}">${p ? p + '%' : txt0}</button>`).join('')
+    + `<input id="${idOtro}" type="number" min="0" max="100" step="1" placeholder="otro %" value="${otro ? valor : ''}" class="${otro ? 'on' : ''}" aria-label="${aria}">`;
 }
+function renderDesc(){
+  chipsPct($('#descBtns'), CONFIG.DESCUENTOS_RAPIDOS, descPct, 'Sin desc.', 'descOtro', 'Otro descuento en %');
+  chipsPct($('#recBtns'), CONFIG.RECARGOS_RAPIDOS, recPct, 'Sin recargo', 'recOtro', 'Otro recargo en %');
+}
+function setRec(p){ recPct = Math.max(0, Math.min(100, Number(p) || 0)); renderDesc(); renderCart(); }
+$('#recBtns').addEventListener('click', e => { const b = e.target.closest('button'); if (b){ setRec(b.dataset.p); $('#scan').focus(); } });
+$('#recBtns').addEventListener('change', e => { if (e.target.id === 'recOtro') setRec(e.target.value); });
 function setDesc(p){ descPct = Math.max(0, Math.min(100, Number(p) || 0)); renderDesc(); renderCart(); }
 $('#descBtns').addEventListener('click', e => { const b = e.target.closest('button'); if (b){ setDesc(b.dataset.p); $('#scan').focus(); } });
 $('#descBtns').addEventListener('change', e => { if (e.target.id === 'descOtro') setDesc(e.target.value); });
@@ -611,8 +629,11 @@ function renderCart(){
     <td class="num">${fmt(l.precio * l.cant)}</td>
     <td><button class="btn danger" data-del="${i}" style="padding:4px 10px">✕</button></td></tr>`).join('');
   $('#cartEmpty').style.display = cart.length ? 'none' : 'block';
-  const sub = subtotalCart(), d = descuentoCart();
-  $('#subtRow').hidden = $('#descRow').hidden = !(d > 0);
+  const sub = subtotalCart(), d = descuentoCart(), rc = recargoCart();
+  $('#subtRow').hidden = !(d > 0 || rc > 0);
+  $('#descRow').hidden = !(d > 0);
+  $('#recRow').hidden = !(rc > 0);
+  $('#recLbl').textContent = `Recargo ${recPct}%`; $('#recMonto').textContent = '+' + fmt(rc);
   $('#subtotal').textContent = fmt(sub);
   $('#descLbl').textContent = `Descuento ${descPct}%`; $('#descMonto').textContent = '−' + fmt(d);
   $('#total').textContent = fmt(totalCart());
@@ -647,6 +668,7 @@ async function cobrar(){
   if (paga && paga < totalCart()){ alert(`El pago (${fmt(paga)}) es menor que el total (${fmt(totalCart())}). Corregí el "Paga con" o borralo.`); cobrando = false; $('#cobrar').disabled = false; $('#pagaCon').focus(); return; }
   const nueva = {
     total: totalCart(), subtotal: subtotalCart(), descuento_pct: descPct, descuento: descuentoCart(),
+    recargo_pct: recPct, recargo: recargoCart(),
     medio_pago: $('#medio').value, items: cart.map(l => ({...l})),
     cliente_id: nuevoId(), fecha: new Date().toISOString(),
   };
@@ -662,7 +684,7 @@ async function cobrar(){
     $('#scanMsg').innerHTML = venta.provisorio
       ? `<span class="err">Sin conexión: venta ${venta.provisorio} guardada en esta PC · ${fmt(venta.total)}. Se sube sola cuando vuelva internet.</span>`
       : `<span class="okc">Venta N° ${venta.id} guardada · ${fmt(venta.total)}</span>`;
-    cart = []; $('#pagaCon').value = ''; descPct = 0; renderDesc(); renderCart(); actualizarHoy(); mostrarAviso();
+    cart = []; $('#pagaCon').value = ''; descPct = 0; recPct = 0; renderDesc(); renderCart(); actualizarHoy(); mostrarAviso();
     if (venta.provisorio) sincronizar();
   }catch(err){
     alert('No se pudo guardar la venta: ' + (err.message || err)); 
@@ -743,8 +765,9 @@ function imprimirTicket(v){
     <div class="c">${esc(CONFIG.SUBTITULO)}</div><hr>
     <div>Recibo N° ${v.provisorio ? v.provisorio + ' (provisorio)' : pad(v.id)}</div><div>${fechaHora(v.fecha)}</div><hr>
     ${items.map(l => `<div>${esc(l.nombre)}</div><div class="l"><span>&nbsp;${l.cant} x ${fmt(l.precio)}</span><span>${fmt(l.precio * l.cant)}</span></div>`).join('')}
-    <hr>${Number(v.descuento) > 0 ? `<div class="l"><span>Subtotal</span><span>${fmt(v.subtotal)}</span></div>
-    <div class="l"><span>Descuento ${Number(v.descuento_pct)}%</span><span>-${fmt(v.descuento)}</span></div>` : ''}
+    <hr>${Number(v.descuento) > 0 || Number(v.recargo) > 0 ? `<div class="l"><span>Subtotal</span><span>${fmt(v.subtotal)}</span></div>` : ''}
+    ${Number(v.descuento) > 0 ? `<div class="l"><span>Descuento ${Number(v.descuento_pct)}%</span><span>-${fmt(v.descuento)}</span></div>` : ''}
+    ${Number(v.recargo) > 0 ? `<div class="l"><span>Recargo ${Number(v.recargo_pct)}%</span><span>+${fmt(v.recargo)}</span></div>` : ''}
     <div class="l tot"><span>TOTAL</span><span>${fmt(v.total)}</span></div>
     <div>Pago: ${esc(v.medio_pago || '')}</div>
     ${v.paga_con ? `<div class="l"><span>Paga con</span><span>${fmt(v.paga_con)}</span></div><div class="l"><span>Vuelto</span><span>${fmt(v.paga_con - v.total)}</span></div>` : ''}
@@ -877,7 +900,7 @@ function renderDia(){
   $('#tVentas').innerHTML = ventasDia.slice().sort((a,b) => b.id - a.id).map(v => `<tr class="${v.anulada ? 'anulada' : ''}">
     <td>${pad(v.id)}</td><td>${hora(v.fecha)}</td>
     <td>${(v.items || []).map(l => `${esc(l.nombre)}${l.cant > 1 ? ' x' + l.cant : ''}`).join(', ')}</td>
-    <td>${esc(v.medio_pago || '')}</td><td class="muted">${esc((v.vendedor || '').split('@')[0])}</td><td class="num">${fmt(v.total)}${Number(v.descuento_pct) > 0 ? `<br><span class="muted" style="font-size:12px">−${Number(v.descuento_pct)}%</span>` : ''}</td>
+    <td>${esc(v.medio_pago || '')}</td><td class="muted">${esc((v.vendedor || '').split('@')[0])}</td><td class="num">${fmt(v.total)}${Number(v.descuento_pct) > 0 ? `<br><span class="muted" style="font-size:12px">−${Number(v.descuento_pct)}%</span>` : ''}${Number(v.recargo_pct) > 0 ? `<br><span class="muted" style="font-size:12px">+${Number(v.recargo_pct)}% recargo</span>` : ''}</td>
     <td class="num"><button class="btn" data-re="${v.id}" style="padding:4px 10px">Reimprimir</button>
     ${v.anulada ? '' : `<button class="btn danger" data-an="${v.id}" style="padding:4px 10px">Anular</button>`}</td></tr>`).join('')
     || '<tr><td colspan="7" class="muted">Sin ventas ese día.</td></tr>';
@@ -888,7 +911,7 @@ async function cargarResumenMes(){
   let r; try{ r = await DB.resumen(ini, fin); }catch(err){ return; }
   $('#lblMes').textContent = 'Total de ' + ini.toLocaleDateString('es-AR', {month:'long', year:'numeric'});
   $('#sMes').textContent = fmt(r.total);
-  $('#sMesN').textContent = `${r.cantidad} ventas` + (r.descuentos > 0 ? ` · ${fmt(r.descuentos)} en descuentos` : '');
+  $('#sMesN').textContent = `${r.cantidad} ventas` + (r.descuentos > 0 ? ` · ${fmt(r.descuentos)} en descuentos` : '') + (r.recargos > 0 ? ` · ${fmt(r.recargos)} en recargos` : '');
   compararMesAnterior(ini, r.total);
   cargarGraficos(ini, fin);
   $('#sProm').textContent = fmt(r.cantidad ? r.total / r.cantidad : 0);
@@ -1034,10 +1057,10 @@ $('#csvBtn').onclick = async () => {
   btn.disabled = true; btn.textContent = 'Preparando…';
   try{
     const ventas = await DB.listSales(ini, fin);
-    const filas = [['N°','Fecha','Hora','Artículos','Medio de pago','Cobró','Subtotal','Descuento %','Descuento $','Total','Anulada']].concat(
+    const filas = [['N°','Fecha','Hora','Artículos','Medio de pago','Cobró','Subtotal','Descuento %','Descuento $','Recargo %','Recargo $','Total','Anulada']].concat(
       ventas.map(v => [pad(v.id), new Date(v.fecha).toLocaleDateString('es-AR'), hora(v.fecha),
         (v.items || []).map(l => `${l.nombre} x${l.cant}`).join(' | '), v.medio_pago || '', (v.vendedor || '').split('@')[0],
-        Math.round(v.subtotal ?? v.total), Number(v.descuento_pct || 0), Math.round(v.descuento || 0), Math.round(v.total), v.anulada ? 'SI' : '']));
+        Math.round(v.subtotal ?? v.total), Number(v.descuento_pct || 0), Math.round(v.descuento || 0), Number(v.recargo_pct || 0), Math.round(v.recargo || 0), Math.round(v.total), v.anulada ? 'SI' : '']));
     const csv = '﻿' + filas.map(f => f.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));

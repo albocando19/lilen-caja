@@ -116,3 +116,9 @@ alter table public.ventas add column if not exists descuento_pct numeric(5,2) no
 alter table public.ventas add column if not exists descuento numeric(12,2) not null default 0;
 -- registrar_venta ahora recibe también p_subtotal y p_descuento_pct (ver migración "descuentos_y_graficos" en Supabase)
 -- resumen_ventas devuelve además 'descuentos'; graficos_ventas devuelve por_dia, por_hora y por_dow (hora de Argentina)
+
+-- ===== Recargos (ej. 10% por transferencia) =====
+alter table public.ventas add column if not exists recargo_pct numeric(5,2) not null default 0;
+alter table public.ventas add column if not exists recargo numeric(12,2) not null default 0;
+-- registrar_venta ahora recibe p_recargo_pct; el recargo se calcula sobre (subtotal - descuento).
+-- resumen_ventas devuelve además 'recargos'. Ver migración "recargos" en Supabase.
