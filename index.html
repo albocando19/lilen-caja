@@ -683,7 +683,7 @@ async function cobrar(){
     if ($('#imprimirChk').checked) imprimirTicket({...venta, paga_con: paga || null});
     $('#scanMsg').innerHTML = venta.provisorio
       ? `<span class="err">Sin conexión: venta ${venta.provisorio} guardada en esta PC · ${fmt(venta.total)}. Se sube sola cuando vuelva internet.</span>`
-      : `<span class="okc">Venta N° ${venta.id} guardada · ${fmt(venta.total)}</span>`;
+      : `<span class="okc">${esAdmin ? `Venta N° ${venta.id} guardada` : 'Venta guardada'} · ${fmt(venta.total)}</span>`;
     cart = []; $('#pagaCon').value = ''; descPct = 0; recPct = 0; renderDesc(); renderCart(); actualizarHoy(); mostrarAviso();
     if (venta.provisorio) sincronizar();
   }catch(err){
@@ -758,12 +758,17 @@ function imprimir(html, tipo, despues){
   setTimeout(() => { window.print(); if (despues) despues(); }, 80);
 }
 
+// Código del recibo: no es el número correlativo de venta, así no se puede contar cuántas ventas hubo
+function codRecibo(v){
+  if (v.cliente_id) return '#' + String(v.cliente_id).replace(/-/g, '').slice(0, 6).toUpperCase();
+  return 'N° ' + pad(v.id);   // ventas viejas, anteriores a este cambio
+}
 function imprimirTicket(v){
   const items = v.items || [];
   imprimir(`<div class="tk ${CONFIG.ANCHO_TICKET_MM < 70 ? 'angosto' : ''}">
     <div class="c h">${esc(CONFIG.NOMBRE_LOCAL)}</div>
     <div class="c">${esc(CONFIG.SUBTITULO)}</div><hr>
-    <div>Recibo N° ${v.provisorio ? v.provisorio + ' (provisorio)' : pad(v.id)}</div><div>${fechaHora(v.fecha)}</div><hr>
+    <div>Recibo ${codRecibo(v)}</div><div>${fechaHora(v.fecha)}</div><hr>
     ${items.map(l => `<div>${esc(l.nombre)}</div><div class="l"><span>&nbsp;${l.cant} x ${fmt(l.precio)}</span><span>${fmt(l.precio * l.cant)}</span></div>`).join('')}
     <hr>${Number(v.descuento) > 0 || Number(v.recargo) > 0 ? `<div class="l"><span>Subtotal</span><span>${fmt(v.subtotal)}</span></div>` : ''}
     ${Number(v.descuento) > 0 ? `<div class="l"><span>Descuento ${Number(v.descuento_pct)}%</span><span>-${fmt(v.descuento)}</span></div>` : ''}
@@ -898,7 +903,7 @@ function renderDia(){
   $('#lblDia').textContent = d.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'});
   $('#sDia').textContent = fmt(ok.reduce((s,v) => s + Number(v.total), 0)); $('#sDiaN').textContent = `${ok.length} ventas`;
   $('#tVentas').innerHTML = ventasDia.slice().sort((a,b) => b.id - a.id).map(v => `<tr class="${v.anulada ? 'anulada' : ''}">
-    <td>${pad(v.id)}</td><td>${hora(v.fecha)}</td>
+    <td>${pad(v.id)}${v.cliente_id ? `<br><span class="muted" style="font-size:11px">${codRecibo(v)}</span>` : ''}</td><td>${hora(v.fecha)}</td>
     <td>${(v.items || []).map(l => `${esc(l.nombre)}${l.cant > 1 ? ' x' + l.cant : ''}`).join(', ')}</td>
     <td>${esc(v.medio_pago || '')}</td><td class="muted">${esc((v.vendedor || '').split('@')[0])}</td><td class="num">${fmt(v.total)}${Number(v.descuento_pct) > 0 ? `<br><span class="muted" style="font-size:12px">−${Number(v.descuento_pct)}%</span>` : ''}${Number(v.recargo_pct) > 0 ? `<br><span class="muted" style="font-size:12px">+${Number(v.recargo_pct)}% recargo</span>` : ''}</td>
     <td class="num"><button class="btn" data-re="${v.id}" style="padding:4px 10px">Reimprimir</button>
