@@ -551,7 +551,8 @@ let items = [];
 let cart = [];
 let editando = null;
 
-function activos(){ return items.filter(i => i.activo !== false).sort((a,b) => a.codigo.localeCompare(b.codigo, undefined, {numeric:true})); }
+// Ordenados por precio (de menor a mayor); si dos valen lo mismo, por código
+function activos(){ return items.filter(i => i.activo !== false).sort((a,b) => (Number(a.precio) - Number(b.precio)) || a.codigo.localeCompare(b.codigo, undefined, {numeric:true})); }
 
 /* ============ TABS ============ */
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
