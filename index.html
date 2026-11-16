@@ -89,6 +89,14 @@ body.compacto{padding-top:calc(var(--arriba,50) * 1vh)}
 .compacto .desc button{padding:2px 7px;font-size:12px;white-space:nowrap}
 .compacto .desc input{width:46px;padding:2px 5px;font-size:12px}
 .compacto .subt{font-size:12px;line-height:1.2}
+.prendas{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:10px 0 0;padding:8px 12px;border-radius:12px;background:var(--rosa);border:1px solid var(--rosa-borde);font-weight:600;font-size:15px}
+.prendas .pn{font-size:30px;font-weight:700;line-height:1;color:var(--acc);font-variant-numeric:tabular-nums;order:2}
+.prendas.vacio{opacity:.55}
+.prendas.pop .pn{animation:pop .25s ease}
+@keyframes pop{50%{transform:scale(1.25)}}
+@media(prefers-reduced-motion:reduce){.prendas.pop .pn{animation:none}}
+.compacto .prendas{margin:3px 0 0;padding:2px 9px;font-size:13px;border-radius:8px}
+.compacto .prendas .pn{font-size:20px}
 .compacto .totalFila{display:flex;justify-content:space-between;align-items:baseline}
 .compacto .totalFila .muted{margin:0!important;font-size:13px}
 .compacto .total{font-size:26px;margin:0 0 3px}
@@ -323,6 +331,7 @@ const CONFIG = {
           <div class="subt" id="subtRow" hidden><span>Subtotal</span><span id="subtotal">$ 0</span></div>
           <div class="subt ahorro" id="descRow" hidden><span id="descLbl">Descuento</span><span id="descMonto">−$ 0</span></div>
           <div class="subt recargo" id="recRow" hidden><span id="recLbl">Recargo</span><span id="recMonto">+$ 0</span></div>
+          <div class="prendas" id="prendasBox"><span class="pn" id="prendasN">0</span><span id="prendasTxt">prendas</span></div>
           <div class="totalFila"><div class="muted" style="margin-top:6px">Total</div>
           <div class="total" id="total">$ 0</div></div>
           <div class="vuelto" id="vueltoBox" hidden>
@@ -638,6 +647,10 @@ function renderCart(){
   $('#subtotal').textContent = fmt(sub);
   $('#descLbl').textContent = `Descuento ${descPct}%`; $('#descMonto').textContent = '−' + fmt(d);
   $('#total').textContent = fmt(totalCart());
+  const n = cart.reduce((s,l) => s + l.cant, 0), pb = $('#prendasBox');
+  if ($('#prendasN').textContent !== String(n)){ pb.classList.remove('pop'); void pb.offsetWidth; pb.classList.add('pop'); }
+  $('#prendasN').textContent = n; $('#prendasTxt').textContent = n === 1 ? 'prenda en la venta' : 'prendas en la venta';
+  pb.classList.toggle('vacio', !n);
   $('#cobrar').disabled = !cart.length;
   renderVuelto();
 }
@@ -774,6 +787,7 @@ function imprimirTicket(v){
     <hr>${Number(v.descuento) > 0 || Number(v.recargo) > 0 ? `<div class="l"><span>Subtotal</span><span>${fmt(v.subtotal)}</span></div>` : ''}
     ${Number(v.descuento) > 0 ? `<div class="l"><span>Descuento ${Number(v.descuento_pct)}%</span><span>-${fmt(v.descuento)}</span></div>` : ''}
     ${Number(v.recargo) > 0 ? `<div class="l"><span>Recargo ${Number(v.recargo_pct)}%</span><span>+${fmt(v.recargo)}</span></div>` : ''}
+    <div class="l"><span>Prendas</span><span>${items.reduce((s,l) => s + Number(l.cant || 0), 0)}</span></div>
     <div class="l tot"><span>TOTAL</span><span>${fmt(v.total)}</span></div>
     <div>Pago: ${esc(v.medio_pago || '')}</div>
     ${v.paga_con ? `<div class="l"><span>Paga con</span><span>${fmt(v.paga_con)}</span></div><div class="l"><span>Vuelto</span><span>${fmt(v.paga_con - v.total)}</span></div>` : ''}
