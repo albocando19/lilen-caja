@@ -122,3 +122,9 @@ alter table public.ventas add column if not exists recargo_pct numeric(5,2) not 
 alter table public.ventas add column if not exists recargo numeric(12,2) not null default 0;
 -- registrar_venta ahora recibe p_recargo_pct; el recargo se calcula sobre (subtotal - descuento).
 -- resumen_ventas devuelve además 'recargos'. Ver migración "recargos" en Supabase.
+
+-- ===== Pago mixto (efectivo + transferencia) =====
+alter table public.ventas add column if not exists pago_efectivo numeric(12,2);
+alter table public.ventas add column if not exists pago_transferencia numeric(12,2);
+-- registrar_venta recibe p_pago_efectivo; con medio 'Mixto' el recargo va solo sobre la parte de transferencia.
+-- resumen_ventas reparte las ventas mixtas entre Efectivo y Transferencia en 'por_medio'. Ver migración "pago_mixto".

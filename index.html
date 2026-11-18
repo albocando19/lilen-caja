@@ -187,6 +187,19 @@ td.num,th.num{text-align:right}
 .desc button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
 .desc.rec button.on{background:var(--oro);border-color:var(--oro);color:#1d1608}
 .subt.recargo{color:var(--oro)}
+.mixto{margin:4px 0 12px;padding:10px 12px;border-radius:12px;background:var(--rosa);border:1px solid var(--rosa-borde)}
+.mixto input{width:100%;font-size:18px;padding:8px 10px;margin-top:4px}
+.mixRes{display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin-top:8px;font-size:15px;font-variant-numeric:tabular-nums}
+.mixRes b{font-size:18px}
+.mixRes .err{grid-column:1/-1;font-size:13px}
+.compacto .mixto{padding:4px 7px;margin:0 0 3px;border-radius:8px;display:grid;grid-template-columns:96px 1fr;gap:6px;align-items:center}
+.compacto .mixto[hidden]{display:none}
+.compacto #subtRow{display:none!important}
+.compacto .mixRes{margin-top:0!important;gap:0 6px;line-height:1.15}
+.compacto .mixto label{display:none}
+.compacto .mixto input{font-size:13px;padding:3px 7px;margin:0}
+.compacto .mixRes{font-size:12px;margin-top:3px}
+.compacto .mixRes b{font-size:14px}
 .desc input{width:84px;padding:7px 8px;font-size:14px}
 .subt{display:flex;justify-content:space-between;font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
 .subt.ahorro{color:var(--ok)}
@@ -264,7 +277,8 @@ const CONFIG = {
   ANCHO_TICKET_MM: 58,          // 80 o 58 según la impresora térmica
   SUPABASE_URL: 'https://jqqtjygmdoadofarnbco.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_5fSvvUgb3kU5zIxmQFWJHg_CKP508Do',
-  MEDIOS_PAGO: ['Efectivo','Débito','Crédito','Transferencia','QR / Mercado Pago'],
+  MEDIOS_PAGO: ['Efectivo','Transferencia','Mixto','Débito','Crédito','QR / Mercado Pago'],
+  RECARGO_TRANSFERENCIA: 10,           // % de recargo que se pone solo al elegir Transferencia o Mixto (0 = no)
   DESCUENTOS_RAPIDOS: [0, 5, 10, 15, 20],   // botones de descuento (opcional, arranca en "Sin desc.")
   RECARGOS_RAPIDOS: [0, 5, 10, 15, 20],     // botones de recargo, ej. 10% por transferencia (opcional, arranca en "Sin recargo")
 };
@@ -334,6 +348,11 @@ const CONFIG = {
           <div class="prendas" id="prendasBox"><span class="pn" id="prendasN">0</span><span id="prendasTxt">prendas</span></div>
           <div class="totalFila"><div class="muted" style="margin-top:6px">Total</div>
           <div class="total" id="total">$ 0</div></div>
+          <div class="mixto" id="mixtoBox" hidden>
+            <label for="mixEf" class="muted" style="font-size:13px">¿Cuánto paga en efectivo?</label>
+            <input id="mixEf" type="text" inputmode="numeric" placeholder="$ en efectivo" autocomplete="off">
+            <div class="mixRes" id="mixRes"></div>
+          </div>
           <div class="vuelto" id="vueltoBox" hidden>
             <label for="pagaCon" class="muted cLbl" style="font-size:13px">Paga con (opcional)</label>
             <input id="pagaCon" type="text" inputmode="numeric" placeholder="Paga con $…" autocomplete="off">
@@ -484,7 +503,8 @@ const Local = {
     const it = {}, me = {};
     ok.forEach(v => {
       (v.items || []).forEach(l => { it[l.nombre] ??= {u:0, t:0}; it[l.nombre].u += l.cant; it[l.nombre].t += l.cant * l.precio; });
-      const m = v.medio_pago || '-'; me[m] ??= {n:0, t:0}; me[m].n++; me[m].t += Number(v.total);
+      const add = (m, t) => { me[m] ??= {n:0, t:0}; me[m].n++; me[m].t += Number(t); };
+      if (v.medio_pago === 'Mixto'){ add('Efectivo', v.pago_efectivo); add('Transferencia', v.pago_transferencia); } else add(v.medio_pago || '-', v.total);
     });
     return {
       total: ok.reduce((s,v) => s + Number(v.total), 0), cantidad: ok.length,
@@ -522,6 +542,7 @@ const Remote = {
       p_cliente_id: s.cliente_id || null, p_fecha: s.fecha || null,
       p_subtotal: s.subtotal ?? null, p_descuento_pct: s.descuento_pct || 0,
       ...(s.recargo_pct ? {p_recargo_pct: s.recargo_pct} : {}),
+      ...(s.medio_pago === 'Mixto' ? {p_pago_efectivo: s.pago_efectivo} : {}),
     }).abortSignal(AbortSignal.timeout(8000));
     if (error) throw error; return data;
   },
@@ -599,7 +620,11 @@ function subtotalCart(){ return cart.reduce((s,l) => s + l.precio * l.cant, 0); 
 let recPct = 0;
 function descuentoCart(){ return Math.round(subtotalCart() * descPct / 100); }
 // El recargo se calcula sobre lo que queda después del descuento (igual que en la base)
-function recargoCart(){ return Math.round((subtotalCart() - descuentoCart()) * recPct / 100); }
+// En pago mixto el recargo va solo sobre la parte que se paga por transferencia
+function esMixto(){ return $('#medio').value === 'Mixto'; }
+function baseCart(){ return subtotalCart() - descuentoCart(); }
+function efectivoMixto(){ return esMixto() ? Math.min(numPesos($('#mixEf').value), baseCart()) : 0; }
+function recargoCart(){ return Math.round((baseCart() - efectivoMixto()) * recPct / 100); }
 function totalCart(){ return subtotalCart() - descuentoCart() + recargoCart(); }
 function numPesos(txt){ return Math.round(Number(String(txt).replace(/[^\d,]/g, '').replace(',', '.')) || 0); }
 
@@ -619,6 +644,18 @@ function setDesc(p){ descPct = Math.max(0, Math.min(100, Number(p) || 0)); rende
 $('#descBtns').addEventListener('click', e => { const b = e.target.closest('button'); if (b){ setDesc(b.dataset.p); $('#scan').focus(); } });
 $('#descBtns').addEventListener('change', e => { if (e.target.id === 'descOtro') setDesc(e.target.value); });
 
+function renderMixto(){
+  const on = esMixto() && cart.length > 0;
+  $('#mixtoBox').hidden = !on;
+  if (!on) return;
+  const base = baseCart(), ef = numPesos($('#mixEf').value), res = $('#mixRes');
+  if (!ef){ res.innerHTML = `<span class="muted" style="grid-column:1/-1;font-size:13px">Poné cuánto paga en efectivo. El resto va por transferencia${recPct ? ` (+${recPct}% sobre esa parte)` : ''}.</span>`; return; }
+  if (ef >= base){ res.innerHTML = `<span class="err">El efectivo tiene que ser menor al total (${fmt(base)}). Si paga todo en efectivo, elegí Efectivo.</span>`; return; }
+  const trBase = base - ef, rc = recargoCart();
+  res.innerHTML = `<span>Efectivo</span><b>${fmt(ef)}</b><span>Transferencia${rc ? ` <span class="muted">(${fmt(trBase)} + ${recPct}%)</span>` : ''}</span><b>${fmt(trBase + rc)}</b>`;
+}
+$('#mixEf').addEventListener('input', () => renderCart());
+$('#mixEf').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); cobrar(); } });
 function renderVuelto(){
   const efectivo = $('#medio').value === 'Efectivo';
   $('#vueltoBox').hidden = !efectivo || !cart.length;
@@ -652,7 +689,7 @@ function renderCart(){
   $('#prendasN').textContent = n; $('#prendasTxt').textContent = n === 1 ? 'prenda en la venta' : 'prendas en la venta';
   pb.classList.toggle('vacio', !n);
   $('#cobrar').disabled = !cart.length;
-  renderVuelto();
+  renderVuelto(); renderMixto();
 }
 
 $('#cart').addEventListener('click', e => {
@@ -669,7 +706,9 @@ function renderQuick(){
 $('#quick').addEventListener('click', e => { const b = e.target.closest('button'); if (b){ agregar(b.dataset.c); $('#scan').focus(); } });
 
 $('#medio').innerHTML = CONFIG.MEDIOS_PAGO.map(m => `<option>${esc(m)}</option>`).join('');
-$('#medio').addEventListener('change', renderVuelto);
+// Al elegir Transferencia o Mixto se pone solo el recargo (se puede cambiar a mano)
+function recargoPorMedio(){ return ['Transferencia', 'Mixto'].includes($('#medio').value) ? (CONFIG.RECARGO_TRANSFERENCIA || 0) : 0; }
+$('#medio').addEventListener('change', () => { if (!esMixto()) $('#mixEf').value = ''; setRec(recargoPorMedio()); if (esMixto()) $('#mixEf').focus(); });
 renderDesc();
 
 $('#vaciar').onclick = () => { if (cart.length && confirm('¿Vaciar la venta actual?')){ cart = []; renderCart(); } $('#scan').focus(); };
@@ -679,10 +718,15 @@ async function cobrar(){
   if (!cart.length || cobrando) return;
   cobrando = true; $('#cobrar').disabled = true;
   const paga = $('#medio').value === 'Efectivo' ? numPesos($('#pagaCon').value) : 0;
+  if (esMixto()){
+    const ef = numPesos($('#mixEf').value);
+    if (!ef || ef >= baseCart()){ alert('En pago mixto poné cuánto paga en efectivo (tiene que ser menos que el total).'); cobrando = false; $('#cobrar').disabled = false; $('#mixEf').focus(); return; }
+  }
   if (paga && paga < totalCart()){ alert(`El pago (${fmt(paga)}) es menor que el total (${fmt(totalCart())}). Corregí el "Paga con" o borralo.`); cobrando = false; $('#cobrar').disabled = false; $('#pagaCon').focus(); return; }
   const nueva = {
     total: totalCart(), subtotal: subtotalCart(), descuento_pct: descPct, descuento: descuentoCart(),
     recargo_pct: recPct, recargo: recargoCart(),
+    ...(esMixto() ? {pago_efectivo: efectivoMixto(), pago_transferencia: totalCart() - efectivoMixto()} : {}),
     medio_pago: $('#medio').value, items: cart.map(l => ({...l})),
     cliente_id: nuevoId(), fecha: new Date().toISOString(),
   };
@@ -698,7 +742,7 @@ async function cobrar(){
     $('#scanMsg').innerHTML = venta.provisorio
       ? `<span class="err">Sin conexión: venta ${venta.provisorio} guardada en esta PC · ${fmt(venta.total)}. Se sube sola cuando vuelva internet.</span>`
       : `<span class="okc">${esAdmin ? `Venta N° ${venta.id} guardada` : 'Venta guardada'} · ${fmt(venta.total)}</span>`;
-    cart = []; $('#pagaCon').value = ''; descPct = 0; recPct = 0; renderDesc(); renderCart(); actualizarHoy(); mostrarAviso();
+    cart = []; $('#pagaCon').value = ''; $('#mixEf').value = ''; descPct = 0; recPct = recargoPorMedio(); renderDesc(); renderCart(); actualizarHoy(); mostrarAviso();
     if (venta.provisorio) sincronizar();
   }catch(err){
     alert('No se pudo guardar la venta: ' + (err.message || err)); 
@@ -789,7 +833,9 @@ function imprimirTicket(v){
     ${Number(v.recargo) > 0 ? `<div class="l"><span>Recargo ${Number(v.recargo_pct)}%</span><span>+${fmt(v.recargo)}</span></div>` : ''}
     <div class="l"><span>Prendas</span><span>${items.reduce((s,l) => s + Number(l.cant || 0), 0)}</span></div>
     <div class="l tot"><span>TOTAL</span><span>${fmt(v.total)}</span></div>
-    <div>Pago: ${esc(v.medio_pago || '')}</div>
+    ${v.medio_pago === 'Mixto'
+      ? `<div>Pago mixto:</div><div class="l"><span>&nbsp;Efectivo</span><span>${fmt(v.pago_efectivo)}</span></div><div class="l"><span>&nbsp;Transferencia</span><span>${fmt(v.pago_transferencia)}</span></div>`
+      : `<div>Pago: ${esc(v.medio_pago || '')}</div>`}
     ${v.paga_con ? `<div class="l"><span>Paga con</span><span>${fmt(v.paga_con)}</span></div><div class="l"><span>Vuelto</span><span>${fmt(v.paga_con - v.total)}</span></div>` : ''}
     ${v.anulada ? '<div class="c tot">*** ANULADA ***</div>' : ''}
     <hr><div class="c">${esc(CONFIG.PIE_RECIBO).replace(/\n/g,'<br>')}</div>
@@ -920,7 +966,7 @@ function renderDia(){
   $('#tVentas').innerHTML = ventasDia.slice().sort((a,b) => b.id - a.id).map(v => `<tr class="${v.anulada ? 'anulada' : ''}">
     <td>${pad(v.id)}${v.cliente_id ? `<br><span class="muted" style="font-size:11px">${codRecibo(v)}</span>` : ''}</td><td>${hora(v.fecha)}</td>
     <td>${(v.items || []).map(l => `${esc(l.nombre)}${l.cant > 1 ? ' x' + l.cant : ''}`).join(', ')}</td>
-    <td>${esc(v.medio_pago || '')}</td><td class="muted">${esc((v.vendedor || '').split('@')[0])}</td><td class="num">${fmt(v.total)}${Number(v.descuento_pct) > 0 ? `<br><span class="muted" style="font-size:12px">−${Number(v.descuento_pct)}%</span>` : ''}${Number(v.recargo_pct) > 0 ? `<br><span class="muted" style="font-size:12px">+${Number(v.recargo_pct)}% recargo</span>` : ''}</td>
+    <td>${esc(v.medio_pago || '')}${v.medio_pago === 'Mixto' ? `<br><span class="muted" style="font-size:12px">Ef ${fmt(v.pago_efectivo)} · Tr ${fmt(v.pago_transferencia)}</span>` : ''}</td><td class="muted">${esc((v.vendedor || '').split('@')[0])}</td><td class="num">${fmt(v.total)}${Number(v.descuento_pct) > 0 ? `<br><span class="muted" style="font-size:12px">−${Number(v.descuento_pct)}%</span>` : ''}${Number(v.recargo_pct) > 0 ? `<br><span class="muted" style="font-size:12px">+${Number(v.recargo_pct)}% recargo</span>` : ''}</td>
     <td class="num"><button class="btn" data-re="${v.id}" style="padding:4px 10px">Reimprimir</button>
     ${v.anulada ? '' : `<button class="btn danger" data-an="${v.id}" style="padding:4px 10px">Anular</button>`}</td></tr>`).join('')
     || '<tr><td colspan="7" class="muted">Sin ventas ese día.</td></tr>';
@@ -1077,10 +1123,11 @@ $('#csvBtn').onclick = async () => {
   btn.disabled = true; btn.textContent = 'Preparando…';
   try{
     const ventas = await DB.listSales(ini, fin);
-    const filas = [['N°','Fecha','Hora','Artículos','Medio de pago','Cobró','Subtotal','Descuento %','Descuento $','Recargo %','Recargo $','Total','Anulada']].concat(
+    const filas = [['N°','Fecha','Hora','Artículos','Medio de pago','Cobró','Subtotal','Descuento %','Descuento $','Recargo %','Recargo $','Total','Efectivo $','Transferencia $','Anulada']].concat(
       ventas.map(v => [pad(v.id), new Date(v.fecha).toLocaleDateString('es-AR'), hora(v.fecha),
         (v.items || []).map(l => `${l.nombre} x${l.cant}`).join(' | '), v.medio_pago || '', (v.vendedor || '').split('@')[0],
-        Math.round(v.subtotal ?? v.total), Number(v.descuento_pct || 0), Math.round(v.descuento || 0), Number(v.recargo_pct || 0), Math.round(v.recargo || 0), Math.round(v.total), v.anulada ? 'SI' : '']));
+        Math.round(v.subtotal ?? v.total), Number(v.descuento_pct || 0), Math.round(v.descuento || 0), Number(v.recargo_pct || 0), Math.round(v.recargo || 0), Math.round(v.total),
+        Math.round(v.pago_efectivo ?? (v.medio_pago === 'Efectivo' ? v.total : 0)), Math.round(v.pago_transferencia ?? (v.medio_pago === 'Transferencia' ? v.total : 0)), v.anulada ? 'SI' : '']));
     const csv = '﻿' + filas.map(f => f.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));
