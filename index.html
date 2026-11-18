@@ -821,16 +821,28 @@ function codRecibo(v){
   if (v.cliente_id) return '#' + String(v.cliente_id).replace(/-/g, '').slice(0, 6).toUpperCase();
   return 'N° ' + pad(v.id);   // ventas viejas, anteriores a este cambio
 }
+// El ticket NO muestra el recargo: si hubo, se reparte dentro del precio de cada prenda
+// y la suma de las líneas da justo el total cobrado.
+function lineasTicket(v){
+  const items = v.items || [], rec = Number(v.recargo) || 0, desc = Number(v.descuento) || 0;
+  const base = (Number(v.subtotal) || items.reduce((s,l) => s + l.precio * l.cant, 0)) - desc;
+  const f = rec > 0 && base > 0 ? (base + rec) / base : 1;
+  const ls = items.map(l => { const u = Math.round(l.precio * f); return {nombre: l.nombre, cant: l.cant, unit: u, monto: u * l.cant}; });
+  const descT = Math.round(desc * f);
+  // Ajuste de redondeo en la última línea para que cierre exacto con el total
+  const dif = Number(v.total) - (ls.reduce((s,l) => s + l.monto, 0) - descT);
+  if (ls.length && dif){ const u = ls[ls.length - 1]; u.monto += dif; if (u.cant === 1) u.unit = u.monto; }
+  return {ls, descT};
+}
 function imprimirTicket(v){
-  const items = v.items || [];
+  const items = v.items || [], {ls, descT} = lineasTicket(v);
   imprimir(`<div class="tk ${CONFIG.ANCHO_TICKET_MM < 70 ? 'angosto' : ''}">
     <div class="c h">${esc(CONFIG.NOMBRE_LOCAL)}</div>
     <div class="c">${esc(CONFIG.SUBTITULO)}</div><hr>
     <div>Recibo ${codRecibo(v)}</div><div>${fechaHora(v.fecha)}</div><hr>
-    ${items.map(l => `<div>${esc(l.nombre)}</div><div class="l"><span>&nbsp;${l.cant} x ${fmt(l.precio)}</span><span>${fmt(l.precio * l.cant)}</span></div>`).join('')}
-    <hr>${Number(v.descuento) > 0 || Number(v.recargo) > 0 ? `<div class="l"><span>Subtotal</span><span>${fmt(v.subtotal)}</span></div>` : ''}
-    ${Number(v.descuento) > 0 ? `<div class="l"><span>Descuento ${Number(v.descuento_pct)}%</span><span>-${fmt(v.descuento)}</span></div>` : ''}
-    ${Number(v.recargo) > 0 ? `<div class="l"><span>Recargo ${Number(v.recargo_pct)}%</span><span>+${fmt(v.recargo)}</span></div>` : ''}
+    ${ls.map(l => `<div>${esc(l.nombre)}</div><div class="l"><span>&nbsp;${l.cant} x ${fmt(l.unit)}</span><span>${fmt(l.monto)}</span></div>`).join('')}
+    <hr>${descT > 0 ? `<div class="l"><span>Subtotal</span><span>${fmt(ls.reduce((s,l) => s + l.monto, 0))}</span></div>
+    <div class="l"><span>Descuento ${Number(v.descuento_pct)}%</span><span>-${fmt(descT)}</span></div>` : ''}
     <div class="l"><span>Prendas</span><span>${items.reduce((s,l) => s + Number(l.cant || 0), 0)}</span></div>
     <div class="l tot"><span>TOTAL</span><span>${fmt(v.total)}</span></div>
     ${v.medio_pago === 'Mixto'
