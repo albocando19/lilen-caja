@@ -1,8 +1,9 @@
 // Guarda la caja en la PC para que abra aunque no haya internet.
 // La página se pide primero a internet (así siempre llegan los cambios) y si no hay, usa la copia guardada.
-const CACHE = 'lilen-caja-v2';
+const CACHE = 'lilen-caja-v3';
 const LIBRERIAS = [
   'https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4',
 ];
 const IMAGENES = ['assets/peonia-izq.jpg', 'assets/peonia-der.jpg', 'assets/logo.jpg'];

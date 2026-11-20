@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Jost:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4"></script>
 <style id="pageStyle"></style>
 <style>
@@ -187,6 +188,8 @@ td.num,th.num{text-align:right}
 .desc button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
 .desc.rec button.on{background:var(--oro);border-color:var(--oro);color:#1d1608}
 .subt.recargo{color:var(--oro)}
+.fact-ok{color:var(--ok);font-size:12px;font-weight:600}
+.fact-err{color:var(--bad);font-size:12px}
 .mixto{margin:4px 0 12px;padding:10px 12px;border-radius:12px;background:var(--rosa);border:1px solid var(--rosa-borde)}
 .mixto input{width:100%;font-size:18px;padding:8px 10px;margin-top:4px}
 .mixRes{display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin-top:8px;font-size:15px;font-variant-numeric:tabular-nums}
@@ -260,6 +263,7 @@ td.num,th.num{text-align:right}
 .tk .l span:last-child{white-space:nowrap}
 .tk .c{text-align:center}.tk .h{font-size:16pt;font-weight:700;letter-spacing:2px}
 .tk hr{border:none;border-top:1px dashed #000;margin:2mm 0}
+.tk .qr svg{width:30mm;height:30mm;margin:2mm auto 1mm;display:block}
 .tk .l{display:flex;justify-content:space-between;gap:4px}
 .tk .tot{font-size:14pt;font-weight:700}
 </style>
@@ -274,6 +278,16 @@ const CONFIG = {
   NOMBRE_LOCAL: 'LILEN',
   SUBTITULO: 'Lilen Márquez Indumentaria',
   PIE_RECIBO: '¡Gracias por tu compra!\nComprobante no válido como factura',
+  PIE_FACTURA: '¡Gracias por tu compra!',
+  // Datos que van impresos en la Factura C
+  FISCAL: {
+    RAZON_SOCIAL: 'VEGA ORIANA GRACIELA',
+    CUIT: '27-39921272-9',
+    CONDICION: 'Responsable Monotributo',
+    DOMICILIO: 'Sargento Cabral 1276 - San Miguel (Bs. As.)',
+    IIBB: '',               // N° de Ingresos Brutos (opcional)
+    INICIO_ACT: '',         // Fecha de inicio de actividades, ej. '01/2024' (opcional)
+  },
   ANCHO_TICKET_MM: 58,          // 80 o 58 según la impresora térmica
   SUPABASE_URL: 'https://jqqtjygmdoadofarnbco.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_5fSvvUgb3kU5zIxmQFWJHg_CKP508Do',
@@ -358,7 +372,10 @@ const CONFIG = {
             <input id="pagaCon" type="text" inputmode="numeric" placeholder="Paga con $…" autocomplete="off">
             <div class="res" id="vueltoRes" hidden></div>
           </div>
-          <label class="row imprimirLbl" style="margin-bottom:12px;font-size:15px"><input type="checkbox" id="imprimirChk" checked style="width:18px;height:18px"> Imprimir recibo</label>
+          <div class="row imprimirLbl" style="margin-bottom:12px;font-size:15px;gap:14px">
+            <label class="row" style="gap:6px"><input type="checkbox" id="imprimirChk" checked style="width:18px;height:18px"> Imprimir recibo</label>
+            <label class="row" style="gap:6px" id="facturaLbl" hidden><input type="checkbox" id="facturaChk" style="width:18px;height:18px"> Emitir factura</label>
+          </div>
           <div class="accionesCobro">
             <button class="btn pri big" id="cobrar" disabled>Cobrar (F2)</button>
             <button class="btn" id="vaciar" style="width:100%;margin-top:8px">Vaciar venta</button>
@@ -713,6 +730,21 @@ renderDesc();
 
 $('#vaciar').onclick = () => { if (cart.length && confirm('¿Vaciar la venta actual?')){ cart = []; renderCart(); } $('#scan').focus(); };
 
+/* ============ FACTURA ELECTRÓNICA (ARCA) ============
+   La función "arca" en Supabase emite la Factura C y devuelve la venta con CAE y número. */
+const nroFactura = v => `${String(v.factura_pv).padStart(4,'0')}-${String(v.factura_nro).padStart(8,'0')}`;
+async function emitirFactura(ventaId){
+  const {data, error} = await sb.functions.invoke('arca', {body: {accion: 'facturar', venta_id: ventaId}});
+  if (error){
+    let msg = error.message || String(error);
+    try{ const j = await error.context.json(); if (j?.error) msg = j.error; }catch{}
+    throw new Error(msg);
+  }
+  if (!data?.ok) throw new Error(data?.error || 'Error desconocido');
+  return data.venta;
+}
+if (usaSupabase) $('#facturaLbl').hidden = false;
+
 let cobrando = false;
 async function cobrar(){
   if (!cart.length || cobrando) return;
@@ -738,10 +770,22 @@ async function cobrar(){
       try{ venta = await DB.addSale(nueva); }
       catch(err){ if (usaSupabase && esErrorDeRed(err)) venta = Cola.agregar(nueva); else throw err; }
     }
+    const quiereFactura = usaSupabase && $('#facturaChk').checked;
+    let msgFactura = '';
+    if (quiereFactura && venta.provisorio){
+      Cola.marcarFactura(venta.cliente_id);
+      msgFactura = ' La factura se emite sola cuando vuelva internet; reimprimila desde Ventas.';
+    } else if (quiereFactura){
+      $('#scanMsg').innerHTML = '<span class="muted">Emitiendo factura en ARCA…</span>';
+      try{ venta = await emitirFactura(venta.id); msgFactura = ` Factura C ${nroFactura(venta)} emitida.`; }
+      catch(err){ msgFactura = ` ⚠ No se pudo emitir la factura (${err.message}). Se imprimió el recibo común; podés facturarla después desde Ventas.`; }
+    }
     if ($('#imprimirChk').checked) imprimirTicket({...venta, paga_con: paga || null});
+    $('#facturaChk').checked = false;
     $('#scanMsg').innerHTML = venta.provisorio
       ? `<span class="err">Sin conexión: venta ${venta.provisorio} guardada en esta PC · ${fmt(venta.total)}. Se sube sola cuando vuelva internet.</span>`
       : `<span class="okc">${esAdmin ? `Venta N° ${venta.id} guardada` : 'Venta guardada'} · ${fmt(venta.total)}</span>`;
+    if (msgFactura) $('#scanMsg').innerHTML += `<span class="${/⚠/.test(msgFactura) ? 'err' : 'okc'}">${esc(msgFactura)}</span>`;
     cart = []; $('#pagaCon').value = ''; $('#mixEf').value = ''; descPct = 0; recPct = recargoPorMedio(); renderDesc(); renderCart(); actualizarHoy(); mostrarAviso();
     if (venta.provisorio) sincronizar();
   }catch(err){
@@ -834,12 +878,32 @@ function lineasTicket(v){
   if (ls.length && dif){ const u = ls[ls.length - 1]; u.monto += dif; if (u.cant === 1) u.unit = u.monto; }
   return {ls, descT};
 }
+// QR que exige ARCA en las facturas (RG 4892)
+function qrFactura(v){
+  const datos = {ver: 1, fecha: v.factura_fecha, cuit: Number(CONFIG.FISCAL.CUIT.replace(/\D/g, '')), ptoVta: v.factura_pv, tipoCmp: v.factura_tipo,
+    nroCmp: Number(v.factura_nro), importe: Number(v.total), moneda: 'PES', ctz: 1, tipoDocRec: 99, nroDocRec: 0, tipoCodAut: 'E', codAut: Number(v.factura_cae)};
+  const url = 'https://www.afip.gob.ar/fe/qr/?p=' + btoa(JSON.stringify(datos));
+  try{ const q = qrcode(0, 'M'); q.addData(url); q.make(); return q.createSvgTag({cellSize: 2, margin: 0, scalable: true}); }catch{ return ''; }
+}
+function cabeceraFactura(v){
+  const F = CONFIG.FISCAL, f = v.factura_fecha.split('-').reverse().join('/');
+  return `<div class="c h">FACTURA C</div><div class="c">Cód. 011 · ORIGINAL</div><hr>
+    <div><b>${esc(F.RAZON_SOCIAL)}</b></div><div>${esc(CONFIG.SUBTITULO)}</div>
+    <div>CUIT: ${esc(F.CUIT)}</div><div>${esc(F.CONDICION)}</div><div>${esc(F.DOMICILIO)}</div>
+    ${F.IIBB ? `<div>IIBB: ${esc(F.IIBB)}</div>` : ''}${F.INICIO_ACT ? `<div>Inicio de act.: ${esc(F.INICIO_ACT)}</div>` : ''}<hr>
+    <div>Nro: ${nroFactura(v)}</div><div>Fecha: ${f}</div><div>A CONSUMIDOR FINAL</div><hr>`;
+}
+function pieFactura(v){
+  const vto = v.factura_cae_vto.split('-').reverse().join('/');
+  return `<hr><div>CAE: ${esc(v.factura_cae)}</div><div>Vto. CAE: ${vto}</div>
+    <div class="c qr">${qrFactura(v)}</div><div class="c">Comprobante autorizado por ARCA</div>`;
+}
 function imprimirTicket(v){
-  const items = v.items || [], {ls, descT} = lineasTicket(v);
+  const items = v.items || [], {ls, descT} = lineasTicket(v), fac = !!v.factura_cae;
   imprimir(`<div class="tk ${CONFIG.ANCHO_TICKET_MM < 70 ? 'angosto' : ''}">
-    <div class="c h">${esc(CONFIG.NOMBRE_LOCAL)}</div>
+    ${fac ? cabeceraFactura(v) : `<div class="c h">${esc(CONFIG.NOMBRE_LOCAL)}</div>
     <div class="c">${esc(CONFIG.SUBTITULO)}</div><hr>
-    <div>Recibo ${codRecibo(v)}</div><div>${fechaHora(v.fecha)}</div><hr>
+    <div>Recibo ${codRecibo(v)}</div><div>${fechaHora(v.fecha)}</div><hr>`}
     ${ls.map(l => `<div>${esc(l.nombre)}</div><div class="l"><span>&nbsp;${l.cant} x ${fmt(l.unit)}</span><span>${fmt(l.monto)}</span></div>`).join('')}
     <hr>${descT > 0 ? `<div class="l"><span>Subtotal</span><span>${fmt(ls.reduce((s,l) => s + l.monto, 0))}</span></div>
     <div class="l"><span>Descuento ${Number(v.descuento_pct)}%</span><span>-${fmt(descT)}</span></div>` : ''}
@@ -850,7 +914,8 @@ function imprimirTicket(v){
       : `<div>Pago: ${esc(v.medio_pago || '')}</div>`}
     ${v.paga_con ? `<div class="l"><span>Paga con</span><span>${fmt(v.paga_con)}</span></div><div class="l"><span>Vuelto</span><span>${fmt(v.paga_con - v.total)}</span></div>` : ''}
     ${v.anulada ? '<div class="c tot">*** ANULADA ***</div>' : ''}
-    <hr><div class="c">${esc(CONFIG.PIE_RECIBO).replace(/\n/g,'<br>')}</div>
+    ${fac ? pieFactura(v) : ''}
+    <hr><div class="c">${esc(fac ? CONFIG.PIE_FACTURA : CONFIG.PIE_RECIBO).replace(/\n/g,'<br>')}</div>
   </div>`, 'ticket');
 }
 
@@ -976,10 +1041,10 @@ function renderDia(){
   $('#lblDia').textContent = d.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'});
   $('#sDia').textContent = fmt(ok.reduce((s,v) => s + Number(v.total), 0)); $('#sDiaN').textContent = `${ok.length} ventas`;
   $('#tVentas').innerHTML = ventasDia.slice().sort((a,b) => b.id - a.id).map(v => `<tr class="${v.anulada ? 'anulada' : ''}">
-    <td>${pad(v.id)}${v.cliente_id ? `<br><span class="muted" style="font-size:11px">${codRecibo(v)}</span>` : ''}</td><td>${hora(v.fecha)}</td>
+    <td>${pad(v.id)}${v.cliente_id ? `<br><span class="muted" style="font-size:11px">${codRecibo(v)}</span>` : ''}${v.factura_cae ? `<br><span class="fact-ok">Fact. C ${nroFactura(v)}</span>` : ''}</td><td>${hora(v.fecha)}</td>
     <td>${(v.items || []).map(l => `${esc(l.nombre)}${l.cant > 1 ? ' x' + l.cant : ''}`).join(', ')}</td>
     <td>${esc(v.medio_pago || '')}${v.medio_pago === 'Mixto' ? `<br><span class="muted" style="font-size:12px">Ef ${fmt(v.pago_efectivo)} · Tr ${fmt(v.pago_transferencia)}</span>` : ''}</td><td class="muted">${esc((v.vendedor || '').split('@')[0])}</td><td class="num">${fmt(v.total)}${Number(v.descuento_pct) > 0 ? `<br><span class="muted" style="font-size:12px">−${Number(v.descuento_pct)}%</span>` : ''}${Number(v.recargo_pct) > 0 ? `<br><span class="muted" style="font-size:12px">+${Number(v.recargo_pct)}% recargo</span>` : ''}</td>
-    <td class="num"><button class="btn" data-re="${v.id}" style="padding:4px 10px">Reimprimir</button>
+    <td class="num">${!v.factura_cae && !v.anulada && usaSupabase ? `<button class="btn" data-fa="${v.id}" style="padding:4px 10px">Facturar</button> ` : ''}<button class="btn" data-re="${v.id}" style="padding:4px 10px">Reimprimir</button>
     ${v.anulada ? '' : `<button class="btn danger" data-an="${v.id}" style="padding:4px 10px">Anular</button>`}</td></tr>`).join('')
     || '<tr><td colspan="7" class="muted">Sin ventas ese día.</td></tr>';
 }
@@ -1122,8 +1187,19 @@ function ventaCambio(fila){
 
 $('#tVentas').addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b) return;
-  const v = ventasDia.find(x => String(x.id) === (b.dataset.re || b.dataset.an));
+  const v = ventasDia.find(x => String(x.id) === (b.dataset.re || b.dataset.an || b.dataset.fa));
+  if (b.dataset.fa){
+    if (!confirm(`¿Emitir Factura C por ${fmt(v.total)} para esta venta? Se informa a ARCA y no se puede deshacer.`)) return;
+    b.disabled = true; b.textContent = 'Facturando…';
+    try{
+      const f = await emitirFactura(v.id);
+      Object.assign(v, f); renderDia();
+      if (confirm(`Factura C ${nroFactura(f)} emitida. ¿La imprimo?`)) imprimirTicket(f);
+    }catch(err){ alert('No se pudo emitir la factura: ' + err.message); b.disabled = false; b.textContent = 'Facturar'; }
+    return;
+  }
   if (b.dataset.re) imprimirTicket(v);
+  else if (v.factura_cae) alert(`Esta venta tiene la Factura C ${nroFactura(v)}. Para anularla hace falta una nota de crédito en ARCA: hablalo con el contador antes de anularla.`);
   else if (confirm(`¿Anular la venta N° ${pad(v.id)} de ${fmt(v.total)}?`)){
     try{ await DB.voidSale(v.id); v.anulada = true; renderDia(); cargarResumenMes(); actualizarHoy(); }catch(err){ alert(err.message || err); }
   }
@@ -1197,6 +1273,7 @@ const Cola = {
     const c = this.leer(); c.push(item); this.guardar(c);   // si esto falla, sale el error y la venta NO se da por cobrada
     return item;
   },
+  marcarFactura(cliente_id){ this.guardar(this.leer().map(x => x.cliente_id === cliente_id ? {...x, facturar: true} : x)); },
   quitar(cliente_id){ this.guardar(this.leer().filter(x => x.cliente_id !== cliente_id)); },
 };
 
@@ -1208,8 +1285,9 @@ async function sincronizar(){
   try{
     for (const v of pendientes){
       try{
-        await Remote.addSale(v);
+        const g = await Remote.addSale(v);
         Cola.quitar(v.cliente_id); errorSync = '';
+        if (v.facturar && g?.id) emitirFactura(g.id).catch(err => console.warn('Factura pendiente no emitida', err));
       }catch(err){
         errorSync = esErrorDeRed(err) ? '' : (err.message || String(err));
         break;   // se reintenta más tarde, respetando el orden
