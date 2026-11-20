@@ -128,3 +128,7 @@ alter table public.ventas add column if not exists pago_efectivo numeric(12,2);
 alter table public.ventas add column if not exists pago_transferencia numeric(12,2);
 -- registrar_venta recibe p_pago_efectivo; con medio 'Mixto' el recargo va solo sobre la parte de transferencia.
 -- resumen_ventas reparte las ventas mixtas entre Efectivo y Transferencia en 'por_medio'. Ver migración "pago_mixto".
+
+-- ===== Facturación ARCA (Factura C, punto de venta 4) =====
+-- Tabla arca_ta (ticket de acceso cacheado, solo la usa la función) y columnas factura_* en ventas.
+-- La función supabase/functions/arca usa los secretos ARCA_CERT y ARCA_KEY (cargados en el panel de Supabase).
