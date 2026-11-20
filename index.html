@@ -401,6 +401,7 @@ const CONFIG = {
       <div class="stat"><div class="l" id="lblDia">Día</div><div class="v" id="sDia">$ 0</div><div class="l" id="sDiaN"></div></div>
       <div class="stat"><div class="l" id="lblMes">Mes</div><div class="v" id="sMes">$ 0</div><div class="l" id="sMesN"></div></div>
       <div class="stat"><div class="l">Ticket promedio del mes</div><div class="v" id="sProm">$ 0</div></div>
+      <div class="stat" id="sFactCard"><div class="l">Facturado en ARCA (caja)</div><div class="v" id="sFact">$ 0</div><div class="l" id="sFactN"></div></div>
     </div>
     <div class="card">
       <h2>Ventas por día <span class="muted" id="gDiaSub" style="font-weight:400;font-size:13px"></span></h2>
@@ -527,6 +528,7 @@ const Local = {
       total: ok.reduce((s,v) => s + Number(v.total), 0), cantidad: ok.length,
       descuentos: ok.reduce((s,v) => s + Number(v.descuento || 0), 0),
       recargos: ok.reduce((s,v) => s + Number(v.recargo || 0), 0),
+      facturado: ok.filter(v => v.factura_cae).reduce((s,v) => s + Number(v.total), 0), facturas: ok.filter(v => v.factura_cae).length,
       por_item: Object.entries(it).map(([nombre,x]) => ({nombre, ...x})).sort((a,b) => b.t - a.t),
       por_medio: Object.entries(me).map(([medio,x]) => ({medio, ...x})).sort((a,b) => b.t - a.t),
     };
@@ -584,7 +586,7 @@ const Remote = {
   async resumen(desde, hasta){
     const {data, error} = await sb.rpc('resumen_ventas', {p_desde: desde.toISOString(), p_hasta: hasta.toISOString()});
     if (error) throw error;
-    return {...data, total: Number(data.total), cantidad: Number(data.cantidad), descuentos: Number(data.descuentos || 0), recargos: Number(data.recargos || 0)};
+    return {...data, total: Number(data.total), cantidad: Number(data.cantidad), descuentos: Number(data.descuentos || 0), recargos: Number(data.recargos || 0), facturado: Number(data.facturado || 0), facturas: Number(data.facturas || 0)};
   },
   async graficos(desde, hasta){
     const {data, error} = await sb.rpc('graficos_ventas', {p_desde: desde.toISOString(), p_hasta: hasta.toISOString()});
@@ -1058,6 +1060,8 @@ async function cargarResumenMes(){
   compararMesAnterior(ini, r.total);
   cargarGraficos(ini, fin);
   $('#sProm').textContent = fmt(r.cantidad ? r.total / r.cantidad : 0);
+  $('#sFact').textContent = fmt(r.facturado || 0);
+  $('#sFactN').textContent = `${r.facturas || 0} factura${r.facturas === 1 ? '' : 's'} C · ${ini.toLocaleDateString('es-AR', {month:'long'})}` + (r.total ? ` · ${Math.round((r.facturado || 0) / r.total * 100)}% de lo vendido` : '');
   $('#tPorItem').innerHTML = (r.por_item || []).map(x => `<tr><td>${esc(x.nombre)}</td><td class="num">${Number(x.u)}</td><td class="num">${fmt(x.t)}</td></tr>`).join('')
     || '<tr><td colspan="3" class="muted">—</td></tr>';
   $('#tPorMedio').innerHTML = (r.por_medio || []).map(x => `<tr><td>${esc(x.medio)}</td><td class="num">${Number(x.n)}</td><td class="num">${fmt(x.t)}</td></tr>`).join('')
