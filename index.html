@@ -279,6 +279,7 @@ const CONFIG = {
   SUBTITULO: 'Lilen Márquez Indumentaria',
   PIE_RECIBO: '¡Gracias por tu compra!\nComprobante no válido como factura',
   PIE_FACTURA: '¡Gracias por tu compra!',
+  FACTURA_AL_COBRAR: false,            // true = muestra la casilla "Emitir factura" en la Caja
   // Datos que van impresos en la Factura C
   FISCAL: {
     RAZON_SOCIAL: 'VEGA ORIANA GRACIELA',
@@ -745,7 +746,7 @@ async function emitirFactura(ventaId){
   if (!data?.ok) throw new Error(data?.error || 'Error desconocido');
   return data.venta;
 }
-if (usaSupabase) $('#facturaLbl').hidden = false;
+if (usaSupabase && CONFIG.FACTURA_AL_COBRAR) $('#facturaLbl').hidden = false;
 
 let cobrando = false;
 async function cobrar(){
@@ -772,7 +773,7 @@ async function cobrar(){
       try{ venta = await DB.addSale(nueva); }
       catch(err){ if (usaSupabase && esErrorDeRed(err)) venta = Cola.agregar(nueva); else throw err; }
     }
-    const quiereFactura = usaSupabase && $('#facturaChk').checked;
+    const quiereFactura = usaSupabase && CONFIG.FACTURA_AL_COBRAR && $('#facturaChk').checked;
     let msgFactura = '';
     if (quiereFactura && venta.provisorio){
       Cola.marcarFactura(venta.cliente_id);
