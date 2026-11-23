@@ -1,7 +1,9 @@
 // Facturación electrónica ARCA (Factura C, monotributo) para la caja de Lilén Márquez.
 // Acciones:
 //   { accion: "ultimo" }               -> último número de Factura C autorizado en el punto de venta (no emite nada)
-//   { accion: "facturar", venta_id }   -> emite la Factura C de esa venta y guarda CAE y número
+//   { accion: "facturar", venta_id, receptor? } -> emite la Factura C de esa venta y guarda CAE y número
+//      receptor (opcional): { nombre, doc_tipo: 96 DNI | 80 CUIT | 86 CUIL, doc_nro, cond_iva: 5 CF | 6 Monotributo | 1 RI | 4 Exento, domicilio? }
+//      sin receptor = consumidor final anónimo
 import forge from "npm:node-forge@1.3.1";
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
@@ -74,6 +76,30 @@ async function ultimo(ta: { token: string; sign: string }) {
   return Number(nro);
 }
 
+// Valida y normaliza los datos del cliente. Devuelve null si es anónimo.
+const COND = { 5: "Consumidor Final", 6: "Responsable Monotributo", 1: "IVA Responsable Inscripto", 4: "IVA Sujeto Exento" } as Record<number, string>;
+function cuitOk(n: string) {
+  if (!/^\d{11}$/.test(n)) return false;
+  const m = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  const s = m.reduce((a, k, i) => a + k * Number(n[i]), 0);
+  let dv = 11 - (s % 11); if (dv === 11) dv = 0; if (dv === 10) dv = 9;
+  return dv === Number(n[10]);
+}
+function receptor(r: any) {
+  if (!r) return null;
+  const nombre = String(r.nombre || "").trim().replace(/\s+/g, " ").slice(0, 120);
+  const doc_tipo = Number(r.doc_tipo), doc_nro = String(r.doc_nro || "").replace(/\D/g, "");
+  const cond_iva = Number(r.cond_iva || 5);
+  const domicilio = String(r.domicilio || "").trim().slice(0, 150) || null;
+  if (!nombre) throw new Error("Falta el nombre del cliente");
+  if (![96, 80, 86].includes(doc_tipo)) throw new Error("Tipo de documento inválido");
+  if (!COND[cond_iva]) throw new Error("Condición frente al IVA inválida");
+  if (doc_tipo === 96 && !/^\d{7,8}$/.test(doc_nro)) throw new Error("El DNI tiene que tener 7 u 8 números");
+  if (doc_tipo !== 96 && !cuitOk(doc_nro)) throw new Error("El CUIT/CUIL no es válido (revisá los 11 números)");
+  if (cond_iva !== 5 && doc_tipo !== 80) throw new Error("Para esa condición frente al IVA hace falta el CUIT");
+  return { nombre, doc_tipo, doc_nro, cond_iva, cond_iva_txt: COND[cond_iva], domicilio };
+}
+
 const fechaAR = (d: Date) => new Date(d.getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10); // fecha en Argentina (UTC-3)
 
 Deno.serve(async (req) => {
@@ -97,6 +123,8 @@ Deno.serve(async (req) => {
       if (error || !v) return json({ ok: false, error: "No encontré la venta" }, 404);
       if (v.anulada) return json({ ok: false, error: "La venta está anulada" }, 400);
       if (v.factura_cae) return json({ ok: true, ya: true, venta: v });
+      let rec;
+      try { rec = receptor(body.receptor); } catch (e) { return json({ ok: false, error: (e as Error).message }, 400); }
 
       const ta = await ticket(db);
       // Fecha: la de la venta si tiene hasta 5 días; si no, hoy. Nunca antes que la última factura emitida.
@@ -111,11 +139,11 @@ Deno.serve(async (req) => {
       let ultimoErr = "";
       for (let intento = 0; intento < 3; intento++) {
         const nro = (await ultimo(ta)) + 1;
-        const x = await wsfe("FECAESolicitar", `<ar:FeCAEReq><ar:FeCabReq><ar:CantReg>1</ar:CantReg><ar:PtoVta>${PTO_VTA}</ar:PtoVta><ar:CbteTipo>${CBTE_TIPO}</ar:CbteTipo></ar:FeCabReq><ar:FeDetReq><ar:FECAEDetRequest><ar:Concepto>1</ar:Concepto><ar:DocTipo>99</ar:DocTipo><ar:DocNro>0</ar:DocNro><ar:CbteDesde>${nro}</ar:CbteDesde><ar:CbteHasta>${nro}</ar:CbteHasta><ar:CbteFch>${fecha.replace(/-/g, "")}</ar:CbteFch><ar:ImpTotal>${total}</ar:ImpTotal><ar:ImpTotConc>0</ar:ImpTotConc><ar:ImpNeto>${total}</ar:ImpNeto><ar:ImpOpEx>0</ar:ImpOpEx><ar:ImpTrib>0</ar:ImpTrib><ar:ImpIVA>0</ar:ImpIVA><ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz><ar:CondicionIVAReceptorId>5</ar:CondicionIVAReceptorId></ar:FECAEDetRequest></ar:FeDetReq></ar:FeCAEReq>`, ta);
+        const x = await wsfe("FECAESolicitar", `<ar:FeCAEReq><ar:FeCabReq><ar:CantReg>1</ar:CantReg><ar:PtoVta>${PTO_VTA}</ar:PtoVta><ar:CbteTipo>${CBTE_TIPO}</ar:CbteTipo></ar:FeCabReq><ar:FeDetReq><ar:FECAEDetRequest><ar:Concepto>1</ar:Concepto><ar:DocTipo>${rec ? rec.doc_tipo : 99}</ar:DocTipo><ar:DocNro>${rec ? rec.doc_nro : 0}</ar:DocNro><ar:CbteDesde>${nro}</ar:CbteDesde><ar:CbteHasta>${nro}</ar:CbteHasta><ar:CbteFch>${fecha.replace(/-/g, "")}</ar:CbteFch><ar:ImpTotal>${total}</ar:ImpTotal><ar:ImpTotConc>0</ar:ImpTotConc><ar:ImpNeto>${total}</ar:ImpNeto><ar:ImpOpEx>0</ar:ImpOpEx><ar:ImpTrib>0</ar:ImpTrib><ar:ImpIVA>0</ar:ImpIVA><ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz><ar:CondicionIVAReceptorId>${rec ? rec.cond_iva : 5}</ar:CondicionIVAReceptorId></ar:FECAEDetRequest></ar:FeDetReq></ar:FeCAEReq>`, ta);
         const cae = tag(x, "CAE");
         if (tag(x, "Resultado") === "A" && cae) {
           const vto = tag(x, "CAEFchVto")!;
-          const upd = { factura_pv: PTO_VTA, factura_tipo: CBTE_TIPO, factura_nro: nro, factura_fecha: fecha, factura_cae: cae, factura_cae_vto: `${vto.slice(0, 4)}-${vto.slice(4, 6)}-${vto.slice(6, 8)}` };
+          const upd = { factura_pv: PTO_VTA, factura_tipo: CBTE_TIPO, factura_nro: nro, factura_fecha: fecha, factura_cae: cae, factura_cae_vto: `${vto.slice(0, 4)}-${vto.slice(4, 6)}-${vto.slice(6, 8)}`, factura_receptor: rec };
           const { data: g } = await db.from("ventas").update(upd).eq("id", v.id).select().single();
           return json({ ok: true, venta: g || { ...v, ...upd } });
         }
