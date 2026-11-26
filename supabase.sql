@@ -132,3 +132,8 @@ alter table public.ventas add column if not exists pago_transferencia numeric(12
 -- ===== Facturación ARCA (Factura C, punto de venta 4) =====
 -- Tabla arca_ta (ticket de acceso cacheado, solo la usa la función) y columnas factura_* en ventas.
 -- La función supabase/functions/arca usa los secretos ARCA_CERT y ARCA_KEY (cargados en el panel de Supabase).
+
+-- ===== PIN de la pestaña Ventas =====
+-- pin_ventas (hash bcrypt), pin_intentos (bloqueo 5 min tras 5 errores), pin_sesiones (desbloqueo por sesión, 15 min).
+-- Funciones: pin_configurado, establecer_pin, verificar_pin, ventas_desbloqueadas, bloquear_ventas.
+-- Las políticas de lectura/anulación de ventas exigen ventas_desbloqueadas(). Ver migraciones "pin_ventas" y "pin_ventas_sesiones".

@@ -203,6 +203,10 @@ td.num,th.num{text-align:right}
 .desc button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
 .desc.rec button.on{background:var(--oro);border-color:var(--oro);color:#1d1608}
 .subt.recargo{color:var(--oro)}
+.candado{max-width:380px;margin:40px auto;text-align:center;padding:28px 22px}
+.candado .cand-ico{font-size:40px;line-height:1;margin-bottom:8px}
+.candado form{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.candado input{font-size:22px;text-align:center;letter-spacing:.3em}
 .fact-ok{color:var(--ok);font-size:12px;font-weight:600}
 .fact-err{color:var(--bad);font-size:12px}
 .mixto{margin:4px 0 12px;padding:10px 12px;border-radius:12px;background:var(--rosa);border:1px solid var(--rosa-borde)}
@@ -408,10 +412,25 @@ const CONFIG = {
 
   <!-- VENTAS -->
   <section id="ventas" class="tab">
+    <div class="card candado" id="candado" hidden>
+      <div class="cand-ico" aria-hidden="true">🔒</div>
+      <h2 id="candTit">Ventas bloqueadas</h2>
+      <p class="muted" id="candTxt">Ingresá el PIN para ver las ventas.</p>
+      <form id="candForm" autocomplete="off">
+        <input id="pin1" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="PIN" autocomplete="off" aria-label="PIN">
+        <input id="pin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="Repetí el PIN" autocomplete="off" aria-label="Repetí el PIN" hidden>
+        <button class="btn pri" type="submit" id="candBtn">Desbloquear</button>
+      </form>
+      <div id="candMsg" class="err" style="min-height:20px;margin-top:8px;font-size:14px"></div>
+    </div>
+    <div id="ventasContenido">
     <div class="card row">
       <label>Día <input type="date" id="dia"></label>
       <button class="btn" id="hoyBtn">Hoy</button>
       <button class="btn" id="csvBtn">Exportar mes (Excel/CSV)</button>
+      <span style="flex:1"></span>
+      <button class="btn" id="cambiarPinBtn" type="button">Cambiar PIN</button>
+      <button class="btn" id="bloquearBtn" type="button">🔒 Bloquear</button>
     </div>
     <div class="stats">
       <div class="stat"><div class="l" id="lblDia">Día</div><div class="v" id="sDia">$ 0</div><div class="l" id="sDiaN"></div></div>
@@ -436,6 +455,7 @@ const CONFIG = {
         <table><thead><tr><th>Artículo</th><th class="num">Unid.</th><th class="num">Total</th></tr></thead><tbody id="tPorItem"></tbody></table></div>
       <div class="card"><h2>Mes por medio de pago</h2>
         <table><thead><tr><th>Medio</th><th class="num">Ventas</th><th class="num">Total</th></tr></thead><tbody id="tPorMedio"></tbody></table></div>
+    </div>
     </div>
   </section>
 
@@ -620,10 +640,60 @@ let editando = null;
 function activos(){ return items.filter(i => i.activo !== false).sort((a,b) => (Number(a.precio) - Number(b.precio)) || a.codigo.localeCompare(b.codigo, undefined, {numeric:true})); }
 
 /* ============ TABS ============ */
+/* ============ PIN DE VENTAS ============
+   La base solo entrega las ventas si en esta sesión se ingresó el PIN (vale 15 minutos).
+   Así, aunque alguien encuentre la compu con la cuenta abierta, no ve nada sin el PIN. */
+let ventasOK = !usaSupabase, pinNuevo = false;
+async function chequearPin(){
+  if (!usaSupabase){ ventasOK = true; return true; }
+  try{ const {data} = await sb.rpc('ventas_desbloqueadas'); ventasOK = data === true; }catch{ ventasOK = false; }
+  return ventasOK;
+}
+async function mostrarVentas(){
+  const ok = await chequearPin();
+  $('#ventasContenido').hidden = !ok; $('#candado').hidden = ok;
+  $('.hoyCard') && $('.hoyCard').classList.toggle('bloq', !ok);
+  if (ok){ cargarVentas(); return; }
+  let hay = true; try{ const {data} = await sb.rpc('pin_configurado'); hay = data === true; }catch{}
+  pinNuevo = !hay;
+  $('#candTit').textContent = hay ? 'Ventas bloqueadas' : 'Creá el PIN de Ventas';
+  $('#candTxt').textContent = hay ? 'Ingresá el PIN para ver las ventas.' : 'Elegí un PIN de 4 a 8 números. Lo van a usar vos y Ori para entrar a esta pestaña.';
+  $('#pin2').hidden = hay; $('#candBtn').textContent = hay ? 'Desbloquear' : 'Crear PIN';
+  $('#pin1').value = ''; $('#pin2').value = ''; $('#candMsg').textContent = '';
+  setTimeout(() => $('#pin1').focus(), 50);
+}
+$('#candForm').onsubmit = async e => {
+  e.preventDefault();
+  const p1 = $('#pin1').value.trim(), msg = $('#candMsg'); msg.textContent = '';
+  try{
+    if (pinNuevo){
+      if (!/^[0-9]{4,8}$/.test(p1)) return msg.textContent = 'El PIN tiene que tener entre 4 y 8 números.';
+      if (p1 !== $('#pin2').value.trim()) return msg.textContent = 'Los dos PIN no coinciden.';
+      const {error} = await sb.rpc('establecer_pin', {p_nuevo: p1}); if (error) throw error;
+    }
+    const {data, error} = await sb.rpc('verificar_pin', {p_pin: p1}); if (error) throw error;
+    if (data !== true){ $('#pin1').value = ''; return msg.textContent = 'PIN incorrecto.'; }
+    await mostrarVentas(); actualizarHoy();
+  }catch(err){ msg.textContent = err.message || String(err); }
+};
+$('#bloquearBtn').onclick = async () => {
+  try{ await sb.rpc('bloquear_ventas'); }catch{}
+  ventasOK = false; await mostrarVentas(); actualizarHoy();
+};
+$('#cambiarPinBtn').onclick = async () => {
+  const actual = prompt('PIN actual:'); if (actual === null) return;
+  const nuevo = prompt('PIN nuevo (4 a 8 números):'); if (nuevo === null) return;
+  if (prompt('Repetí el PIN nuevo:') !== nuevo) return alert('Los PIN no coinciden. No se cambió.');
+  const {error} = await sb.rpc('establecer_pin', {p_nuevo: nuevo, p_actual: actual});
+  alert(error ? 'No se pudo cambiar: ' + error.message : 'PIN cambiado.');
+};
+// Si el desbloqueo vence mientras la pestaña está abierta, se vuelve a bloquear
+setInterval(async () => { if (usaSupabase && ventasOK && !(await chequearPin())){ if ($('#ventas').classList.contains('on')) mostrarVentas(); actualizarHoy(); } }, 60000);
+
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === b.dataset.t));
-  if (b.dataset.t === 'ventas') cargarVentas();
+  if (b.dataset.t === 'ventas') mostrarVentas();
   if (b.dataset.t === 'etiquetas') renderEtq();
   if (b.dataset.t === 'caja') $('#scan').focus();
 });
@@ -915,6 +985,7 @@ document.addEventListener('click', e => {
 
 async function actualizarHoy(){
   if (!esAdmin) return;
+  if (!ventasOK){ $('#hoyTotal').textContent = '🔒'; $('#hoyCant').textContent = 'Desbloqueá Ventas para ver'; return; }
   const h = new Date(); const d = new Date(h.getFullYear(), h.getMonth(), h.getDate());
   try{
     const r = await DB.resumen(d, new Date(d.getTime() + 864e5));
@@ -1332,6 +1403,7 @@ function limpiarScan(){
 }
 async function arrancar(){
   await cargarRol();
+  if (esAdmin) await chequearPin();
   setTimeout(limpiarScan, 300); setTimeout(() => { if (/@/.test($('#scan').value)) $('#scan').value = ''; }, 1500);
   await cargarItems(); limpiarForm(); renderCart(); actualizarHoy(); $('#scan').focus();
   escucharCambios(); iniciarSincronizacion();
@@ -1383,7 +1455,7 @@ async function sincronizar(){
     }
   } finally {
     sincronizando = false; mostrarAviso();
-    if (!Cola.leer().length){ actualizarHoy(); if ($('#ventas').classList.contains('on')) cargarVentas(); }
+    if (!Cola.leer().length){ actualizarHoy(); if (ventasOK && $('#ventas').classList.contains('on')) cargarVentas(); }
   }
 }
 function mostrarAviso(){
@@ -1429,7 +1501,7 @@ function refrescarHoy(){ clearTimeout(hoyPend); hoyPend = setTimeout(actualizarH
 // Al volver a la pestaña o si se cortó el tiempo real, ponerse al día
 function refrescar(completo){
   refrescarArticulos(); actualizarHoy();
-  if ($('#ventas').classList.contains('on')){ if (completo || !enVivo) cargarVentas(); else cargarResumenMes(); }
+  if (ventasOK && $('#ventas').classList.contains('on')){ if (completo || !enVivo) cargarVentas(); else cargarResumenMes(); }
 }
 function escucharCambios(){
   if (!usaSupabase) return;
