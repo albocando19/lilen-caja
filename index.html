@@ -207,6 +207,10 @@ td.num,th.num{text-align:right}
 .candado .cand-ico{font-size:40px;line-height:1;margin-bottom:8px}
 .candado form{display:flex;flex-direction:column;gap:10px;margin-top:14px}
 .candado input{font-size:22px;text-align:center;letter-spacing:.3em}
+.filtros{gap:12px;align-items:flex-end}
+.filtros label{display:flex;flex-direction:column;gap:3px}
+.filtros label.row{flex-direction:row;align-items:center}
+.filtros select,.filtros input[type=text]{font-size:14px;padding:6px 9px}
 .fact-ok{color:var(--ok);font-size:12px;font-weight:600}
 .fact-err{color:var(--bad);font-size:12px}
 .mixto{margin:4px 0 12px;padding:10px 12px;border-radius:12px;background:var(--rosa);border:1px solid var(--rosa-borde)}
@@ -448,6 +452,15 @@ const CONFIG = {
     </div>
     <div class="card">
       <h2>Ventas del día</h2>
+      <div class="row filtros" style="margin-bottom:10px">
+        <label class="muted" style="font-size:13px">Medio
+          <select id="fMedio"><option value="">Todos</option><option>Efectivo</option><option>Transferencia</option><option>Mixto</option></select></label>
+        <label class="muted" style="font-size:13px">Monto desde
+          <input id="fMin" type="text" inputmode="numeric" placeholder="$ 0" style="width:110px"></label>
+        <label class="row" style="gap:6px;font-size:14px"><input type="checkbox" id="fSinFact" style="width:16px;height:16px"> Solo sin facturar</label>
+        <button class="btn" id="fLimpiar" type="button" style="padding:6px 12px">Limpiar</button>
+        <span class="muted" id="fRes" style="font-size:13px"></span>
+      </div>
       <table><thead><tr><th>N°</th><th>Hora</th><th>Artículos</th><th>Pago</th><th>Cobró</th><th class="num">Total</th><th></th></tr></thead><tbody id="tVentas"></tbody></table>
     </div>
     <div class="caja" style="grid-template-columns:1fr 1fr">
@@ -1195,14 +1208,24 @@ function renderDia(){
   const d = diaSel(), ok = ventasDia.filter(v => !v.anulada);
   $('#lblDia').textContent = d.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'});
   $('#sDia').textContent = fmt(ok.reduce((s,v) => s + Number(v.total), 0)); $('#sDiaN').textContent = `${ok.length} ventas`;
-  $('#tVentas').innerHTML = ventasDia.slice().sort((a,b) => b.id - a.id).map(v => `<tr class="${v.anulada ? 'anulada' : ''}">
+  // Filtros de la lista (no cambian los totales de arriba)
+  const fm = $('#fMedio').value, fmin = numPesos($('#fMin').value), fsf = $('#fSinFact').checked;
+  const filtrando = !!(fm || fmin || fsf);
+  const lista = ventasDia.filter(v => (!fm || v.medio_pago === fm) && (!fmin || Number(v.total) >= fmin) && (!fsf || (!v.factura_cae && !v.anulada)));
+  const okL = lista.filter(v => !v.anulada);
+  $('#fRes').textContent = filtrando ? `${okL.length} venta${okL.length === 1 ? '' : 's'} · ${fmt(okL.reduce((s,v) => s + Number(v.total), 0))}` : '';
+  $('#tVentas').innerHTML = lista.slice().sort((a,b) => b.id - a.id).map(v => `<tr class="${v.anulada ? 'anulada' : ''}">
     <td>${pad(v.id)}${v.cliente_id ? `<br><span class="muted" style="font-size:11px">${codRecibo(v)}</span>` : ''}${v.factura_cae ? `<br><span class="fact-ok">Fact. C ${nroFactura(v)}</span>${v.factura_receptor ? `<br><span class="muted" style="font-size:11px">${esc(v.factura_receptor.nombre)}</span>` : ''}` : ''}</td><td>${hora(v.fecha)}</td>
     <td>${(v.items || []).map(l => `${esc(l.nombre)}${l.cant > 1 ? ' x' + l.cant : ''}`).join(', ')}</td>
     <td>${esc(v.medio_pago || '')}${v.medio_pago === 'Mixto' ? `<br><span class="muted" style="font-size:12px">Ef ${fmt(v.pago_efectivo)} · Tr ${fmt(v.pago_transferencia)}</span>` : ''}</td><td class="muted">${esc((v.vendedor || '').split('@')[0])}</td><td class="num">${fmt(v.total)}${Number(v.descuento_pct) > 0 ? `<br><span class="muted" style="font-size:12px">−${Number(v.descuento_pct)}%</span>` : ''}${Number(v.recargo_pct) > 0 ? `<br><span class="muted" style="font-size:12px">+${Number(v.recargo_pct)}% recargo</span>` : ''}</td>
     <td class="num">${!v.factura_cae && !v.anulada && usaSupabase ? `<button class="btn" data-fa="${v.id}" style="padding:4px 10px">Facturar</button> ` : ''}<button class="btn" data-re="${v.id}" style="padding:4px 10px">Reimprimir</button>
     ${v.anulada ? '' : `<button class="btn danger" data-an="${v.id}" style="padding:4px 10px">Anular</button>`}</td></tr>`).join('')
-    || '<tr><td colspan="7" class="muted">Sin ventas ese día.</td></tr>';
+    || `<tr><td colspan="7" class="muted">${filtrando ? 'Ninguna venta coincide con el filtro.' : 'Sin ventas ese día.'}</td></tr>`;
 }
+
+['#fMedio', '#fSinFact'].forEach(id => $(id).addEventListener('change', renderDia));
+$('#fMin').addEventListener('input', renderDia);
+$('#fLimpiar').onclick = () => { $('#fMedio').value = ''; $('#fMin').value = ''; $('#fSinFact').checked = false; renderDia(); };
 
 async function cargarResumenMes(){
   const [ini, fin] = rangoMes();
